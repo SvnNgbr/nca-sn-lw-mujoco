@@ -10,11 +10,6 @@ adjustText
 peft
 seaborn
 ipykernel
-collections
-IPython
-json
-enum
 control
 mediapy
 dataclasses
-os

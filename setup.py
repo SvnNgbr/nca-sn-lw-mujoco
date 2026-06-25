@@ -10,27 +10,27 @@ def ask_user_for_confirmation(prompt: str) -> bool:
         elif user_input == "n":
             return False
         else:
-            print("Invalid input. please use only 'y' or 'n'.")
+            print("Invalid input. Please use only 'y' or 'n'.")
 
 def in_conda() -> bool:
-    return "conda" in sys.executable
+    # Prüfe, ob die Umgebungsvariable CONDA_DEFAULT_ENV existiert (Conda/Miniforge)
+    return "CONDA_DEFAULT_ENV" in os.environ
 
 def in_venv() -> bool:
-    # Prüfen, ob das Skript in einer virtuellen Umgebung läuft
+    # Prüfe, ob das Skript in einer virtuellen Umgebung läuft
     return hasattr(sys, 'real_prefix') or (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix)
 
 if __name__ == "__main__":
-
     if in_conda():
         print("Detected conda environment:", os.environ.get("CONDA_DEFAULT_ENV"))
     elif in_venv():
         print("Detected virtual environment:", sys.prefix)
     else:
-        print("No conda environment detected. Aborting...")
+        print("No conda or virtual environment detected. Aborting...")
         raise EnvironmentError()
-    
+
     print("Starting Setup...")
-    
+
     mujocopath = os.path.join(
         os.path.dirname(__file__),
         "mujoco"
@@ -44,11 +44,9 @@ if __name__ == "__main__":
                 "clone",
                 "https://github.com/deepmind/mujoco.git"
             ],
-            cwd = os.path.dirname(__file__)
+            cwd=os.path.dirname(__file__)
         )
-
         print("Done!")
-
     else:
         print("MuJoCo repository already cloned or folder exists. Skipping...")
 
@@ -58,41 +56,28 @@ if __name__ == "__main__":
     if ask_user_for_confirmation("Blackwell GPU? (y/n): "):
         subprocess.check_call(
             [
-                sys.executable, 
-                "-m", 
-                "pip", 
-                "install", 
-                "-r", 
+                sys.executable,
+                "-m",
+                "pip",
+                "install",
+                "-r",
                 os.path.join(
-                    os.path.dirname(__file__), 
+                    os.path.dirname(__file__),
                     "requirements_blackwell.txt"
                 )
             ]
         )
         blackwell = True
-        # subprocess.check_call(
-        #     [
-        #         sys.executable,
-        #         "-m",
-        #         "pip",
-        #         "install",
-        #         "torch",
-        #         "torchvision",
-        #         "torchaudio",
-        #         "--index-url",
-        #         "https://download.pytorch.org/whl/cu129",
-        #     ]
-        # )
     else:
         subprocess.check_call(
             [
-                sys.executable, 
-                "-m", 
-                "pip", 
-                "install", 
-                "-r", 
+                sys.executable,
+                "-m",
+                "pip",
+                "install",
+                "-r",
                 os.path.join(
-                    os.path.dirname(__file__), 
+                    os.path.dirname(__file__),
                     "requirements.txt"
                 )
             ]
@@ -100,7 +85,7 @@ if __name__ == "__main__":
     print("Done!")
 
     if blackwell:
-        print("Torch installation for Blackwell-series GPUs not possoble in script, please refer to: [link to documentation].")
+        print("Torch installation for Blackwell-series GPUs not possible in script, please refer to: [link to documentation].")
         print("Probably like this: 'pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu129'")
 
     print("Setup complete!")
