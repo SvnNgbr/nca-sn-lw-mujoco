@@ -48,18 +48,28 @@
         </body>
     </body>
 
-        <!-- Rechter oberschenkel -->
+        <!-- Rechter Oberschenkel (Upper Leg) -->
         <body name="right_upper_leg" pos="0.03 -0.2 0">
-        <joint axis="0 1 0" name="right_hip" range="-60 60" type="hinge"/>
-        <geom name="right_leg_geom" size="0.03 0.2" type="cylinder" rgba="0.5 0.5 0 1"/>
-        TBD
+            <joint axis="0 1 0" name="right_hip" range="-120 60" type="hinge"/>
+                <!-- -60 seems out of my head not enough, needs testing therefore -120-->
+        <geom name="right_upper_leg_geom" size="0.03 0.2" type="cylinder" rgba="0.5 0.5 0 1"/>
+
+        <!-- Unterschenkel (Lower Leg) -->
+        <body name="right_lower_leg" pos="0 0 -0.2">
+            <joint axis="0 1 0" name="right_knee" range="0 150" type="hinge"/>
+            <geom name="right_lower_leg_geom" size="0.03 0.2" type="cylinder" rgba="0.5 0.5 0 1"/>
+        </body>
         </body>
 
         <!-- Linker oberschenkel -->
         <body name="left_upper_leg" pos="-0.03 -0.2 0">
-        <joint axis="0 1 0" name="left_hip" range="-60 60" type="hinge"/>
-        <geom name="left_leg_geom" size="0.03 0.2" type="cylinder" rgba="0.5 0.5 0 1"/>
-        TBD
+            <joint axis="0 1 0" name="left_hip" range="-120 60" type="hinge"/>
+        <geom name="left_upper_leg_geom" size="0.03 0.2" type="cylinder" rgba="0.5 0.5 0 1"/>
+        <!-- Unterschenkel (Lower Leg) -->
+        <body name="left_lower_leg" pos="0 0 -0.2">
+            <joint axis="0 1 0" name="left_knee" range="0 150" type="hinge"/>
+            <geom name="left_lower_leg_geom" size="0.03 0.2" type="cylinder" rgba="0.5 0.5 0 1"/>
+        </body>
         </body>
     </body>
     </worldbody>
@@ -71,8 +81,8 @@
         <motor name="right_shoulder_y_motor" joint="right_shoulder_y" gear="100"/>
         <motor name="right_elbow_motor" joint="right_elbow" gear="50"/>
         <!-- leg -->
-        TBD
         <motor name="right_knee_motor" joint="right_knee" gear="150"/>
+        <motor name="right_hip_motor" joint="right_hip" gear="150"/>
 
         <!-- left side -->
         <!-- Arm -->
@@ -80,8 +90,8 @@
         <motor name="left_shoulder_y_motor" joint="left_shoulder_y" gear="100"/>
         <motor name="left_elbow_motor" joint="left_elbow" gear="50"/>
         <!-- leg -->
-        TBD
         <motor name="left_knee_motor" joint="left_knee" gear="150"/>
+        <motor name="left_hip_motor" joint="left_hip" gear="150"/>
         
 </actuator>
     </mujoco>
