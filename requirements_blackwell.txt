@@ -12,3 +12,4 @@ ipykernel
 control
 mediapy
 dataclasses
+mujoco
