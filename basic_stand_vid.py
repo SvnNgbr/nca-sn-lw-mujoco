@@ -22,7 +22,7 @@ num_frames = int(duration * fps)
 camera_id = 0 if model.ncam > 0 else -1
 
 # Rendere Frames mit Offscreen-Renderer
-# Wähle eine Renderauflösung (kann angepasst werden)
+# Wähle eine Renderauflösung
 render_width = 640
 render_height = 480
 
@@ -38,7 +38,6 @@ with mujoco.Renderer(model, render_height, render_width) as renderer:
         out = np.zeros((render_height, render_width, 3), np.uint8)
         img = renderer.render(out=out)
 
-        # MuJoCo liefert RGB, OpenCV erwartet BGR
         img_bgr = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
         fname = f"frames/frame_{i:04d}.png"
         cv2.imwrite(fname, img_bgr)
@@ -58,7 +57,7 @@ for frame_file in frame_files:
 
 video.release()
 
-# Lösche die temporären Frames (optional)
+# Lösche die temporären Frames
 for frame_file in frame_files:
     os.remove(frame_file)
 os.rmdir("frames")
