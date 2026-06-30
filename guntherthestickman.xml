@@ -3,7 +3,7 @@
 
     <default>
         <joint armature="0.01" damping=".1" limited="true"/>
-        <geom conaffinity="0" condim="3" contype="1" friction=".5 .1 .1" rgba="0.8 0.6 .4 1"/>
+        <geom condim="3" friction=".5 .1 .1" rgba="0.8 0.6 .4 1"/>
     </default>
 
     <option integrator="Euler" timestep="0.01"/>
