@@ -13,3 +13,7 @@ control
 mediapy
 dataclasses
 mujoco
+gymnasium
+stable-baselines3
+tensorboard
+imageio
