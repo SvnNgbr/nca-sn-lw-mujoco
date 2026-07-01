@@ -1,7 +1,7 @@
 import os
 
 from stable_baselines3 import PPO
-from standing_env import StandingEnv
+from iter5.standing_env import StandingEnv
 
 os.makedirs("models", exist_ok=True)
 os.makedirs("logs", exist_ok=True)
