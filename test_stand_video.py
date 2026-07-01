@@ -12,7 +12,7 @@ model = PPO.load("humanoid_standup_ppo")
 
 # 3. Video-Einstellungen
 fps = 30
-duration = 10
+duration = 20
 num_frames = fps * duration
 
 # 4. Frames rendern
