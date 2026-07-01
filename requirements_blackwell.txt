@@ -17,3 +17,4 @@ gymnasium
 stable-baselines3
 tensorboard
 imageio
+gymnasium[other]

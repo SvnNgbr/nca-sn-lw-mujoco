@@ -1,33 +1,22 @@
-import gymnasium as gym
-from stable_baselines3 import PPO #quasi pytorch im hintergrund
-from stable_baselines3.common.callbacks import BaseCallback
 import os
 
-# 1. Umgebung laden
-env = gym.make("HumanoidStandup-v5")
+from stable_baselines3 import PPO
+from standing_env import StandingEnv
 
-# 2. Callback für TensorBoard
-class TensorboardCallback(BaseCallback):
-    def __init__(self, verbose=0):
-        super().__init__(verbose)
-        self._log_dir = "logs/standup/"
-        os.makedirs(self._log_dir, exist_ok=True)
+os.makedirs("models", exist_ok=True)
+os.makedirs("logs", exist_ok=True)
 
-    def _on_step(self) -> bool:
-        return True
+env = StandingEnv()
 
-# 3. Modell erstellen
 model = PPO(
-    policy="MlpPolicy",
-    env=env,
+    "MlpPolicy",
+    env,
     verbose=1,
     learning_rate=3e-4,
-    tensorboard_log="logs/standup/"
+    tensorboard_log="logs/"
 )
 
-# 4. Modell trainieren
-model.learn(total_timesteps=50_000, callback=TensorboardCallback()) #50k weil zeit und so
-model.save("humanoid_standup_ppo")
+model.learn(total_timesteps=50_000)
 
-# 5. Umgebung schließen
+model.save("models/humanoid_stand")
 env.close()

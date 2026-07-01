@@ -1,56 +1,56 @@
-import gymnasium as gym
-from stable_baselines3 import PPO
-import cv2
 import os
+import cv2
+import gymnasium as gym
 import numpy as np
+from datetime import datetime
 
-# 1. Umgebung laden (mit RGB-Rendering für Frames)
-env = gym.make("HumanoidStandup-v5", render_mode="rgb_array")
+from stable_baselines3 import PPO
+from standing_env import StandingEnv
 
-# 2. Modell laden
-model = PPO.load("humanoid_standup_ppo")
+video_name = datetime.now().strftime("videos/humanoid_%Y%m%d_%H%M%S.mp4")
+os.makedirs("videos", exist_ok=True)
 
-# 3. Video-Einstellungen
-fps = 30
-duration = 20
-num_frames = fps * duration
 
-# 4. Frames rendern
-os.makedirs("frames", exist_ok=True)
-frame_files = []
+# Setup
+FPS = 30
+DURATION = 20  # Sekunden
+NUM_STEPS = FPS * DURATION
 
-obs, _ = env.reset()
-for i in range(num_frames):
-    action, _ = model.predict(obs)
-    obs, _, terminated, truncated, _ = env.step(action)
+env = StandingEnv(render_mode="rgb_array")
+model = PPO.load("models/humanoid_stand")
 
-    # Rendere Frame (mit OpenCV)
-    img = env.render()
-    if img is not None:
-        img = np.array(img)
-        img_bgr = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-        fname = f"frames/frame_{i:04d}.png"
-        cv2.imwrite(fname, img_bgr)
-        frame_files.append(fname)
 
-    if terminated or truncated:
-        obs, _ = env.reset()
+# Initialisierung
+obs, info = env.reset()
 
-# 5. Video erstellen
-frame_shape = cv2.imread(frame_files[0]).shape[:2][::-1] if frame_files else (640, 480)
+frame = env.render()
+height, width = frame.shape[:2]
+
 video = cv2.VideoWriter(
-    "humanoid_standup.mp4",
+    video_name,
     cv2.VideoWriter_fourcc(*"mp4v"),
-    fps,
-    frame_shape
+    FPS,
+    (width, height)
 )
 
-for fname in frame_files:
-    video.write(cv2.imread(fname))
+# Simulation + Recording
+for step in range(NUM_STEPS):
 
+    action, _ = model.predict(obs, deterministic=True)
+    obs, reward, terminated, truncated, info = env.step(action)
+
+    frame = env.render()
+
+    if frame is not None:
+        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+        video.write(frame)
+
+    # wenn Episode endet -> einfach reset, Video läuft weiter
+    if terminated or truncated:
+        obs, info = env.reset()
+
+# Cleanup
 video.release()
-for fname in frame_files:
-    os.remove(fname)
-os.rmdir("frames")
+env.close()
 
-print(" Video wurde als 'humanoid_standup.mp4' gespeichert!")
+print(f"Video gespeichert: {video_name}")
