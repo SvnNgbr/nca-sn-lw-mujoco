@@ -21,20 +21,20 @@ render_height = 480
 # def of angels for upright stand
 target_qpos = np.array([
     0.0,   # right_shoulder_z
-    0.0,   # right_shoulder_y
+    -10.0, # right_shoulder_y (leicht nach hinten geneigt)
     0.0,   # right_elbow
     0.0,   # right_knee
-    0.0,   # right_hip
+    -10.0, # right_hip (leicht nach hinten geneigt)
     0.0,   # left_shoulder_z
-    0.0,   # left_shoulder_y
+    -10.0, # left_shoulder_y
     0.0,   # left_elbow
     0.0,   # left_knee
-    0.0,   # left_hip
+    -10.0, # left_hip
 ])
 
 # PD-Regler-Parameter
-kp = 10.0  # Prop
-kd = 1.0   # Deriv
+kp = 1.0  # Prop
+kd = 0.10   # Deriv
 
 
 frame_files = []
