@@ -26,7 +26,7 @@ model = PPO(
 )
 
 # 4. Modell trainieren
-model.learn(total_timesteps=50_000, callback=TensorboardCallback())
+model.learn(total_timesteps=50_000, callback=TensorboardCallback()) #50k weil zeit und so
 model.save("humanoid_standup_ppo")
 
 # 5. Umgebung schließen
