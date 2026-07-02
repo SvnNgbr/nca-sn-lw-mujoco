@@ -136,7 +136,11 @@ from stable_baselines3.common.env_util import make_vec_env
 
 class BurpeeEnv(gym.Wrapper):
     def __init__(self, render_mode=None):
-        env = gym.make("Humanoid-v5", render_mode=render_mode)
+        env = gym.make(
+            "Humanoid-v5",
+            render_mode=render_mode,
+            terminate_when_unhealthy=False # cuz healthy is defined as hight > 1.0
+        )
         super().__init__(env)
 
         self.step_count = 0
@@ -194,7 +198,7 @@ class BurpeeEnv(gym.Wrapper):
 
         reward = 0.0
 
-        reward -= 4.0 * pose_error
+        reward -= 1.0 * pose_error  # to not punish doing somthing other than falling in the beginning
         reward -= 12.0 * height_error
         reward -= 0.001 * energy
 
@@ -206,6 +210,10 @@ class BurpeeEnv(gym.Wrapper):
             reward += 2.0 * upright
 
         if torso_height < 0.25:
+            reward -= 50
+            #terminated = True
+
+        if torso_height < 0.10:
             reward -= 100
             terminated = True
 
