@@ -18,11 +18,7 @@ Set up and activate a python environment
 conda create -n mujoco_3_11_15 python=3.11.15
 conda activate mujoco_3_11_15
 ```
-**--- OR ---** 
-```bash
-python -m venv /path/to/new/virtual/environment
-source /path/to/new/virtual/environment/bin/activate
-```
+
 Navigate to the repository folder
 ```bash
 cd nca-sn-lw-mujoco

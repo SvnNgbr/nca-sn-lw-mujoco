@@ -1,3 +1,4 @@
+### setup environment ###
 
 import os
 import cv2
@@ -7,8 +8,10 @@ import numpy as np
 from datetime import datetime
 
 from stable_baselines3 import PPO
-from iter5.standing_env import StandingEnv
 
+#------------------------------------------------------------------------
+
+### setup training ###
 
 class StandingEnv(gym.Wrapper):
     def __init__(self, render_mode=None):
@@ -21,23 +24,33 @@ class StandingEnv(gym.Wrapper):
     def step(self, action):
         obs, _, terminated, truncated, info = self.env.step(action)
 
-        # Höhe des Körpers
+        # hight torso
         torso_height = self.unwrapped.data.qpos[2]
 
+        # orientation of torso (3x3 Rotationsmatrix)
+        torso_mat = self.unwrapped.data.xmat[1].reshape(3, 3)
+
+        # amount of uprightness
+        upright = torso_mat[2, 2]
+
         # Geschwindigkeit
-        velocity = np.linalg.norm(self.unwrapped.data.qvel)
+        #velocity = np.linalg.norm(self.unwrapped.data.qvel)
 
         # Energieverbrauch
-        energy = np.sum(np.square(action))
+        energy = np.sum(action ** 2)
 
-        #punish bewgung weil starten stehend
-        reward = (
-            10.0 * torso_height
-            - 0.05 * velocity
-            - 0.001 * energy
-        )
+        reward = 0.0
 
-        # Umgefallen
+        # upright position is good
+        reward += 5.0 * torso_height
+
+        # do not diverge to sides
+        reward += 3.0 * upright
+
+        # no strong movements
+        reward -= 0.001 * energy
+
+        # punish if down
         if torso_height < 0.9:
             reward -= 100
             terminated = True
@@ -46,6 +59,8 @@ class StandingEnv(gym.Wrapper):
     
 
 #------------------------------------------------------------------------
+
+### train model ###
 
 os.makedirs("models", exist_ok=True)
 os.makedirs("logs", exist_ok=True)
@@ -67,6 +82,8 @@ env.close()
 
 
 #------------------------------------------------------------------------
+
+### create video ###
 
 video_name = datetime.now().strftime("videos/humanoid_%Y%m%d_%H%M%S.mp4")
 os.makedirs("videos", exist_ok=True)
