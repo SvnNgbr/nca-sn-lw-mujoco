@@ -4,14 +4,14 @@ import os
 import cv2
 import gymnasium as gym
 import numpy as np
-import time
+from datetime import datetime
 
 from stable_baselines3 import PPO
 
 import psutil
 from stable_baselines3.common.env_util import make_vec_env
 
-"""
+
 #------------------------------------------------------------------------
 
 ### setup training ###
@@ -80,7 +80,7 @@ from stable_baselines3.common.env_util import make_vec_env
         # Energie-Strafe
         #reward -= 0.001 * energy
 
-        # nicht komplett umfallen
+        # nicht komplett umfallen tets
         #if torso_height < 0.35:
          #   reward -= 50
           #  terminated = True
@@ -129,11 +129,6 @@ from stable_baselines3.common.env_util import make_vec_env
         #    terminated = True
 
     #    return obs, reward, terminated, truncated, info
-"""
-#------------------------------------------------------------------------
-
-### setup training ###
-
 class BurpeeEnv(gym.Wrapper):
     def __init__(self, render_mode=None):
         env = gym.make("Humanoid-v5", render_mode=render_mode)
@@ -213,31 +208,20 @@ class BurpeeEnv(gym.Wrapper):
 
 #------------------------------------------------------------------------
 
+#------------------------------------------------------------------------
+
 ### train model ###
 
 os.makedirs("models", exist_ok=True)
 os.makedirs("logs", exist_ok=True)
 
-physical_cores = psutil.cpu_count(logical=False)
-logical_cores = psutil.cpu_count(logical=True)
-
-# Nutze alle physischen Kerne
-n_envs = physical_cores
-
-print(f"Physische Kerne : {physical_cores}")
-print(f"Logische Kerne  : {logical_cores}")
-print(f"Parallele Envs  : {n_envs}")
-
-env = make_vec_env(
-    StandingEnv,
-    n_envs=n_envs
-)
-
+env = StandingEnv()
 
 model = PPO(
     "MlpPolicy",
     env,
     device="cpu",     
+    #device=device,
     learning_rate=3e-4,
     n_steps=2048,
     batch_size=256,
@@ -245,15 +229,7 @@ model = PPO(
     tensorboard_log="logs/"
 )
 
-start_time = time.perf_counter()
-
-model.learn(total_timesteps=500_000)
-
-end_time = time.perf_counter()
-
-training_time = end_time - start_time
-
-print(f"Training abgeschlossen in {training_time:.2f} Sekunden ")
+model.learn(total_timesteps=50_000)
 
 model.save("models/humanoid_burpee")
 env.close()
