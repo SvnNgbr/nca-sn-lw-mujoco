@@ -48,6 +48,4 @@ You should now be all set to execute the main programs for each task!
 
 # How to run:
 
-python train_stand.py
-
-mjpython test_stand_video.py
+python run.py

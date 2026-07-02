@@ -5,7 +5,7 @@ import numpy as np
 from datetime import datetime
 
 from stable_baselines3 import PPO
-from iter5.standing_env import StandingEnv
+from Iterationen.iter5.standing_env import StandingEnv
 
 video_name = datetime.now().strftime("videos/humanoid_%Y%m%d_%H%M%S.mp4")
 os.makedirs("videos", exist_ok=True)
