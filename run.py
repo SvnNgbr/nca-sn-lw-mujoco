@@ -229,7 +229,7 @@ print(f"Logische Kerne  : {logical_cores}")
 print(f"Parallele Envs  : {n_envs}")
 
 env = make_vec_env(
-    StandingEnv,
+    BurpeeEnv,
     n_envs=n_envs
 )
 
