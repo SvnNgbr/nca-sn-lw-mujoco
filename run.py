@@ -173,7 +173,7 @@ model = PPO(
 
 start_time = time.perf_counter()
 
-model.learn(total_timesteps=500_000)
+model.learn(total_timesteps=5_000_000) #brauchen hier wohl 10mio
 
 end_time = time.perf_counter()
 
