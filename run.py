@@ -1,10 +1,16 @@
 ### setup environment ###
 import os
+
 import cv2
 import gymnasium as gym
 import numpy as np
 from datetime import datetime
+
 from stable_baselines3 import PPO
+
+import psutil
+from stable_baselines3.common.env_util import make_vec_env
+
 
 #------------------------------------------------------------------------
 
@@ -202,32 +208,37 @@ class BurpeeEnv(gym.Wrapper):
 
 #------------------------------------------------------------------------
 
+#------------------------------------------------------------------------
+
 ### train model ###
 
 os.makedirs("models", exist_ok=True)
 os.makedirs("logs", exist_ok=True)
 
-env = BurpeeEnv()
+env = StandingEnv()
 
 model = PPO(
     "MlpPolicy",
     env,
-    verbose=1,
+    device="cpu",     
+    #device=device,
     learning_rate=3e-4,
+    n_steps=2048,
+    batch_size=256,
+    verbose=1,
     tensorboard_log="logs/"
 )
 
-model.learn(total_timesteps=200_000)
+model.learn(total_timesteps=50_000)
 
 model.save("models/humanoid_burpee")
 env.close()
-
 
 #------------------------------------------------------------------------
 
 ### create video ###
 
-video_name = datetime.now().strftime("videos/humanoid_%Y%m%d_%H%M%S.mp4")
+video_name = time.strftime("videos/humanoid_%Y%m%d_%H%M%S.mp4")
 os.makedirs("videos", exist_ok=True)
 
 
