@@ -1,13 +1,18 @@
 ### setup environment ###
 
 import os
+
 import cv2
 
 import gymnasium as gym
 import numpy as np
-from datetime import datetime
+import time
 
 from stable_baselines3 import PPO
+
+import psutil
+from stable_baselines3.common.env_util import make_vec_env
+
 
 #------------------------------------------------------------------------
 
@@ -60,32 +65,60 @@ class StandingEnv(gym.Wrapper):
 
 #------------------------------------------------------------------------
 
+#------------------------------------------------------------------------
+
 ### train model ###
 
 os.makedirs("models", exist_ok=True)
 os.makedirs("logs", exist_ok=True)
 
-env = StandingEnv()
+physical_cores = psutil.cpu_count(logical=False)
+logical_cores = psutil.cpu_count(logical=True)
+
+# Nutze alle physischen Kerne
+n_envs = physical_cores
+
+print(f"Physische Kerne : {physical_cores}")
+print(f"Logische Kerne  : {logical_cores}")
+print(f"Parallele Envs  : {n_envs}")
+
+env = make_vec_env(
+    StandingEnv,
+    n_envs=n_envs
+)
+
+#device = "cuda" if torch.cuda.is_available() else "cpu" #bringt hier nichts
 
 model = PPO(
     "MlpPolicy",
     env,
-    verbose=1,
+    device="cpu",     
+    #device=device,
     learning_rate=3e-4,
+    n_steps=2048,
+    batch_size=256,
+    verbose=1,
     tensorboard_log="logs/"
 )
 
-model.learn(total_timesteps=50_000)
+start_time = time.perf_counter()
+
+model.learn(total_timesteps=500_000)
+
+end_time = time.perf_counter()
+
+training_time = end_time - start_time
+
+print(f"Training abgeschlossen in {training_time:.2f} Sekunden ")
 
 model.save("models/humanoid_stand")
 env.close()
-
 
 #------------------------------------------------------------------------
 
 ### create video ###
 
-video_name = datetime.now().strftime("videos/humanoid_%Y%m%d_%H%M%S.mp4")
+video_name = time.strftime("videos/humanoid_%Y%m%d_%H%M%S.mp4")
 os.makedirs("videos", exist_ok=True)
 
 
