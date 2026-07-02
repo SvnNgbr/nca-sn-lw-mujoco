@@ -11,6 +11,125 @@ from stable_baselines3 import PPO
 import psutil
 from stable_baselines3.common.env_util import make_vec_env
 
+"""
+#------------------------------------------------------------------------
+
+### setup training ###
+
+#class BurpeeEnv(gym.Wrapper):
+  #  def __init__(self, render_mode=None):
+   #     env = gym.make("Humanoid-v5", render_mode=render_mode)
+   #     super().__init__(env)
+   #     self.step_count = 0
+   #     self.phase_length = 150
+
+   # def reset(self, **kwargs):
+       # self.step_count = 0
+       # return self.env.reset(**kwargs)
+
+    #def step(self, action):
+       # obs, _, terminated, truncated, info = self.env.step(action)
+
+       # self.step_count += 1
+
+       # torso_height = self.unwrapped.data.qpos[2]
+       # torso_mat = self.unwrapped.data.xmat[1].reshape(3, 3)
+        #upright = torso_mat[2, 2]
+
+        #forward_velocity = self.unwrapped.data.qvel[0]
+        #vertical_velocity = self.unwrapped.data.qvel[2]
+        #energy = np.sum(action ** 2)
+
+        #phase = (self.step_count // self.phase_length) % 6
+
+        #reward = 0.0
+
+        # Phase 0: stehen
+        #if phase == 0:
+         #   reward += 5.0 * torso_height
+          #  reward += 4.0 * upright
+
+        # Phase 1: runter in Squat
+        #elif phase == 1:
+         #   target_height = 1.0
+          #  reward -= 10.0 * abs(torso_height - target_height)
+           # reward += 2.0 * upright
+
+        # Phase 2: nach vorne / Plank
+        #elif phase == 2:
+         #   target_height = 0.75
+          #  reward -= 10.0 * abs(torso_height - target_height)
+           # reward += 2.0 * forward_velocity
+
+        # Phase 3: Push-up tief
+        #elif phase == 3:
+         #   target_height = 0.55
+          #  reward -= 15.0 * abs(torso_height - target_height)
+
+        # Phase 4: wieder hochkommen
+       # elif phase == 4:
+        #    reward += 8.0 * torso_height
+         #   reward += 3.0 * upright
+          #  reward += 2.0 * vertical_velocity
+
+        # Phase 5: Sprung
+        #elif phase == 5:
+         #   reward += 10.0 * vertical_velocity
+          #  reward += 3.0 * upright
+
+        # Energie-Strafe
+        #reward -= 0.001 * energy
+
+        # nicht komplett umfallen
+        #if torso_height < 0.35:
+         #   reward -= 50
+          #  terminated = True
+
+        #return obs, reward, terminated, truncated, info
+#class BurpeeEnv(gym.Wrapper):
+   # def __init__(self, render_mode=None):
+    #    env = gym.make(
+     #       "Humanoid-v5",
+      #      render_mode=render_mode
+       # )
+        #super().__init__(env)
+
+ #   def step(self, action):
+  #      obs, _, terminated, truncated, info = self.env.step(action)
+#
+ #       # hight torso
+  #      torso_height = self.unwrapped.data.qpos[2]
+#
+        # orientation of torso (3x3 Rotationsmatrix)
+ #       torso_mat = self.unwrapped.data.xmat[1].reshape(3, 3)
+#
+        # amount of uprightness
+  #      upright = torso_mat[2, 2]
+
+        # Geschwindigkeit
+        #velocity = np.linalg.norm(self.unwrapped.data.qvel)
+
+        # Energieverbrauch
+   #     energy = np.sum(action ** 2)
+
+    #    reward = 0.0
+
+        # upright position is good
+     #   reward += 5.0 * torso_height
+
+        # do not diverge to sides
+      #  reward += 3.0 * upright
+
+        # no strong movements
+       # reward -= 0.001 * energy
+
+        # punish if down
+        #if torso_height < 0.9:
+       #     reward -= 100
+        #    terminated = True
+
+    #    return obs, reward, terminated, truncated, info
+"""
 #------------------------------------------------------------------------
 
 ### setup training ###
@@ -23,19 +142,9 @@ class BurpeeEnv(gym.Wrapper):
             terminate_when_unhealthy=False # cuz healthy is defined as hight > 1.0
         )
         super().__init__(env)
-        '''
-        nichtmehr step gebunden sonder phase gebunden
-        erst weiter wenn target erreicht wurde
+
         self.step_count = 0
         self.phase_length = 120
-        '''
-        self.step_count = 0
-
-        # NEW:
-        # Current phase of the burpee sequence.
-        # The agent stays in this phase until it reaches the target.
-        self.current_phase = 0
-
 
         self.pose_targets = {
             0: np.array([0.0, 0.0, 0.0,   0.0, 0.0, 0.0, 0.0,   0.0, 0.0, 0.0, 0.0,   0.2, -0.4, 0.2,   -0.2, 0.4, -0.2]),
@@ -59,30 +168,15 @@ class BurpeeEnv(gym.Wrapper):
             7: 1.45,
         }
 
-    '''
     def reset(self, **kwargs):
         self.step_count = 0
-        return self.env.reset(**kwargs)
-    '''
-    def reset(self, **kwargs):
-        self.step_count = 0
-
-        # NEW:
-        # Always start a new episode from phase 0.
-        self.current_phase = 0
-
         return self.env.reset(**kwargs)
 
     def step(self, action):
         obs, _, terminated, truncated, info = self.env.step(action)
 
         self.step_count += 1
-        '''
         phase = (self.step_count // self.phase_length) % 8
-        '''
-        # NEW:
-        # Stay in the current phase until the target is reached.
-        phase = self.current_phase
 
         qpos = self.unwrapped.data.qpos
         qvel = self.unwrapped.data.qvel
@@ -102,16 +196,7 @@ class BurpeeEnv(gym.Wrapper):
         pose_error = np.linalg.norm(joint_angles - target_pose)
         height_error = abs(torso_height - target_height)
 
-        # ----------------------------------------------------------
-        # NEW:
-        # Move to the next phase only after reaching the current one.
-        # ----------------------------------------------------------
-
-        POSE_THRESHOLD = 0.35
-        HEIGHT_THRESHOLD = 0.08
-
         reward = 0.0
-
 
         reward -= 1.0 * pose_error  # to not punish doing somthing other than falling in the beginning
         reward -= 12.0 * height_error
@@ -124,16 +209,13 @@ class BurpeeEnv(gym.Wrapper):
             reward += 8.0 * vertical_velocity
             reward += 2.0 * upright
 
-        # --- SUCCESS BONUS (ONLY ADDITION) ---
-        if (
-            pose_error < POSE_THRESHOLD
-            and height_error < HEIGHT_THRESHOLD
-        ):
-            reward += 100.0
+        if torso_height < 0.25:
+            reward -= 50
+            #terminated = True
 
-            self.current_phase = min(self.current_phase + 1, 7)
-
-            print(f"Reached phase {self.current_phase}")
+        if torso_height < 0.10:
+            reward -= 100
+            terminated = True
 
         return obs, reward, terminated, truncated, info
 
