@@ -173,7 +173,7 @@ model = PPO(
 
 start_time = time.perf_counter()
 
-model.learn(total_timesteps=5_000_000) #brauchen hier wohl 10mio
+model.learn(total_timesteps=10_000_000) #brauchen hier wohl 10mio (5mio ca 45min)
 
 end_time = time.perf_counter()
 
@@ -194,7 +194,7 @@ os.makedirs("videos", exist_ok=True)
 
 # Setup
 FPS = 30
-DURATION = 20  # Sekunden
+DURATION = 60  # Sekunden
 NUM_STEPS = FPS * DURATION
 
 env = BurpeeEnv(render_mode="rgb_array")
