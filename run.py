@@ -194,7 +194,7 @@ os.makedirs("videos", exist_ok=True)
 
 # Setup
 FPS = 30
-DURATION = 60  # Sekunden
+DURATION = 30  # Sekunden
 NUM_STEPS = FPS * DURATION
 
 env = BurpeeEnv(render_mode="rgb_array")
