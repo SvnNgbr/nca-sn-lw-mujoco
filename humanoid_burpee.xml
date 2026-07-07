@@ -1,0 +1,109 @@
+<mujoco model="humanoid_burpee">
+  <compiler angle="degree" coordinate="local"/>
+
+  <option timestep="0.004" gravity="0 0 -9.81" integrator="RK4"/>
+
+  <visual>
+    <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0.1 0.1 0.1"/>
+    <map force="0.1" znear="0.01"/>
+    <quality shadowsize="2048"/>
+  </visual>
+
+  <asset>
+    <texture name="grid" type="2d" builtin="checker" rgb1="0.18 0.20 0.22" rgb2="0.26 0.28 0.30" width="512" height="512"/>
+    <material name="floor_mat" texture="grid" texrepeat="5 5" reflectance="0.15"/>
+    <material name="body_mat" rgba="0.20 0.45 0.95 1"/>
+    <material name="joint_mat" rgba="0.08 0.10 0.14 1"/>
+    <material name="hand_mat" rgba="0.95 0.78 0.50 1"/>
+  </asset>
+
+  <default>
+    <joint damping="4" armature="0.04" limited="true"/>
+    <geom friction="1.2 0.05 0.01" density="800" contype="1" conaffinity="1"/>
+    <default class="limb">
+      <geom type="capsule" size="0.045" material="body_mat"/>
+    </default>
+    <default class="foot">
+      <geom type="box" size="0.09 0.04 0.025" material="hand_mat"/>
+    </default>
+    <default class="motor">
+      <position kp="180" kv="22" ctrlrange="-2.6 2.6"/>
+    </default>
+  </default>
+
+  <worldbody>
+    <light pos="0 -3 5" dir="0 1 -1" diffuse="0.8 0.8 0.8"/>
+    <geom name="floor" type="plane" size="6 6 0.1" material="floor_mat"/>
+
+    <body name="torso" pos="0 0 1.15">
+      <freejoint name="root"/>
+      <geom name="torso_geom" type="box" size="0.16 0.09 0.26" material="body_mat"/>
+      <body name="head" pos="0 0 0.36">
+        <geom type="sphere" size="0.095" material="hand_mat"/>
+      </body>
+
+      <body name="left_upper_arm" pos="0 0.14 0.18">
+        <joint name="left_shoulder" type="hinge" axis="0 1 0" range="-160 130"/>
+        <geom class="limb" fromto="0 0 0 0 0 -0.28"/>
+        <body name="left_lower_arm" pos="0 0 -0.28">
+          <joint name="left_elbow" type="hinge" axis="0 1 0" range="-150 10"/>
+          <geom class="limb" fromto="0 0 0 0 0 -0.25"/>
+          <body name="left_hand" pos="0 0 -0.28">
+            <geom type="sphere" size="0.055" material="hand_mat"/>
+          </body>
+        </body>
+      </body>
+
+      <body name="right_upper_arm" pos="0 -0.14 0.18">
+        <joint name="right_shoulder" type="hinge" axis="0 1 0" range="-160 130"/>
+        <geom class="limb" fromto="0 0 0 0 0 -0.28"/>
+        <body name="right_lower_arm" pos="0 0 -0.28">
+          <joint name="right_elbow" type="hinge" axis="0 1 0" range="-150 10"/>
+          <geom class="limb" fromto="0 0 0 0 0 -0.25"/>
+          <body name="right_hand" pos="0 0 -0.28">
+            <geom type="sphere" size="0.055" material="hand_mat"/>
+          </body>
+        </body>
+      </body>
+
+      <body name="left_thigh" pos="0 0.08 -0.28">
+        <joint name="left_hip" type="hinge" axis="0 1 0" range="-120 100"/>
+        <geom class="limb" fromto="0 0 0 0 0 -0.36"/>
+        <body name="left_shin" pos="0 0 -0.36">
+          <joint name="left_knee" type="hinge" axis="0 1 0" range="0 150"/>
+          <geom class="limb" fromto="0 0 0 0 0 -0.34"/>
+          <body name="left_foot" pos="0.06 0 -0.36">
+            <joint name="left_ankle" type="hinge" axis="0 1 0" range="-55 55"/>
+            <geom class="foot" pos="0.05 0 -0.01"/>
+          </body>
+        </body>
+      </body>
+
+      <body name="right_thigh" pos="0 -0.08 -0.28">
+        <joint name="right_hip" type="hinge" axis="0 1 0" range="-120 100"/>
+        <geom class="limb" fromto="0 0 0 0 0 -0.36"/>
+        <body name="right_shin" pos="0 0 -0.36">
+          <joint name="right_knee" type="hinge" axis="0 1 0" range="0 150"/>
+          <geom class="limb" fromto="0 0 0 0 0 -0.34"/>
+          <body name="right_foot" pos="0.06 0 -0.36">
+            <joint name="right_ankle" type="hinge" axis="0 1 0" range="-55 55"/>
+            <geom class="foot" pos="0.05 0 -0.01"/>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+
+  <actuator>
+    <position name="left_shoulder_motor" joint="left_shoulder" class="motor"/>
+    <position name="left_elbow_motor" joint="left_elbow" class="motor"/>
+    <position name="right_shoulder_motor" joint="right_shoulder" class="motor"/>
+    <position name="right_elbow_motor" joint="right_elbow" class="motor"/>
+    <position name="left_hip_motor" joint="left_hip" class="motor"/>
+    <position name="left_knee_motor" joint="left_knee" class="motor"/>
+    <position name="left_ankle_motor" joint="left_ankle" class="motor"/>
+    <position name="right_hip_motor" joint="right_hip" class="motor"/>
+    <position name="right_knee_motor" joint="right_knee" class="motor"/>
+    <position name="right_ankle_motor" joint="right_ankle" class="motor"/>
+  </actuator>
+</mujoco>
