@@ -3,6 +3,12 @@ Neuromorphic Control Assignment für den SoSe Kurs von Dr. rer. nat. Johannes Ma
 
 We used the mujoco repository at LINK and build upon it.
 
+Link to Presentation:
+https://www.figma.com/board/lRynw06d1QNUb4VMZNYzNT/NC-Assignment?node-id=0-1&t=1X3BSlGuk0xQx8nC-1
+
+Link to Report:
+https://docs.google.com/document/d/1L832A2-83RfPdtDlJrWloBiF8Uhi3MdTyWWzJrtdEYY/edit?usp=sharing
+
 ---
 
 # Getting Started
