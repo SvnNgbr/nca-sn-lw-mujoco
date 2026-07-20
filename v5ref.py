@@ -1,7 +1,7 @@
 import math
 import numpy as np
 
-# Humanoid v5 Joints (in der richtigen Reihenfolge)
+# Humanoid v5 Joints  (kommentare passen nocht nciht)
 JOINT_NAMES_V5 = [
     "abdomen_z",      # 0: Oberkörper drehen
     "abdomen_y",      # 1: Oberkörper seitlich

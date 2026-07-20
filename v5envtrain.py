@@ -105,6 +105,12 @@ class BurpeeHumanoidV5Env(gym.Env):
             if i < len(ref["joints"]):
                 self.data.qpos[qpos_addr] = ref["joints"][i]
         
+        # Root-Position setzen
+        if "root_pos" in ref:
+            self.data.qpos[self.root_qpos:self.root_qpos+3] = ref["root_pos"]
+        if "root_quat" in ref:
+            self.data.qpos[self.root_qpos+3:self.root_qpos+7] = ref["root_quat"]
+        
         mujoco.mj_forward(self.model, self.data)
         return self._get_obs(), info
 
@@ -118,8 +124,8 @@ class BurpeeHumanoidV5Env(gym.Env):
             self.data.qpos,
             self.data.qvel,
             joint_error,
-            root_pos - np.array([0, 0, 1.4]),  # Referenzhöhe
-            root_quat - np.array([1, 0, 0, 0]),
+            root_pos - ref["root_pos"],
+            root_quat - ref["root_quat"],
             ref["joints"],
             ref["phase"],
         ])
@@ -139,7 +145,7 @@ class BurpeeHumanoidV5Env(gym.Env):
         self.previous_action = action.copy()
         
         root_height = self.data.qpos[self.root_qpos+2]
-        terminated = root_height < 0.3  # Gefallen
+        terminated = root_height < 0.3
         truncated = self.elapsed >= self.episode_seconds
         
         return self._get_obs(), float(reward), terminated, truncated, {
@@ -152,7 +158,7 @@ class BurpeeHumanoidV5Env(gym.Env):
         root_height = self.data.qpos[self.root_qpos+2]
         
         pose_reward = np.exp(-5.0 * np.mean(joint_error * joint_error))
-        height_reward = np.exp(-2.0 * (root_height - 1.3)**2)  # Stehen belohnen
+        height_reward = np.exp(-2.0 * (root_height - 1.3)**2)
         alive_bonus = 1.0 if root_height > 0.5 else -2.0
         control_cost = -0.01 * np.mean(ctrl * ctrl)
         

@@ -9,7 +9,6 @@ import numpy as np
 
 
 # Humanoid v5 aus Gymnasium
-# Die Joint-Namen können je nach Version variieren
 JOINT_NAMES = [
     "left_hip_pitch", "left_hip_roll", "left_hip_yaw",
     "left_knee", "left_ankle_pitch", "left_ankle_roll",
@@ -26,7 +25,6 @@ def deg(values):
     return np.radians(np.array(values, dtype=float))
 
 # Burpee-Keyframes für Humanoid v5 angepasst
-# Die Winkel müssen an die Gelenkstruktur angepasst werden
 BURPEE = [
     {
         "name": "stand",

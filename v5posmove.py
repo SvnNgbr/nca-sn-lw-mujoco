@@ -18,7 +18,7 @@ def quat_from_euler_xyz(euler_deg):
         cr*cp*sy - sr*sp*cy
     ])
 
-# Die Legende als String - automatisch aus BURPEE_V5 generiert
+# Die Legende wird dynamisch generiert, um die verfügbaren Posen und die Steuerung anzuzeigen.
 def generate_legend():
     legend = """
 ======================================================================
@@ -32,7 +32,7 @@ VERFUEGBARE POSEN:"""
     legend += """
 ======================================================================
 BEDIENUNG:
-  • [Zahl 1-9] → Pose auswaehlen
+  • [Zahl] → Pose auswaehlen (1-{})
   • [e] → Edit-Modus (Joint-Winkel aendern) - UEBERNIMMT AKTUELLE POSE
   • [p] → Pose-Modus (zurueck zur Pose)
   • [j + Zahl] → Joint auswaehlen (z.B. 'j7')
@@ -42,7 +42,7 @@ BEDIENUNG:
   • [S] → Winkel -1° (fein)
   • [r] → Alle Gelenke auf 0
   • [q] → Beenden
-======================================================================"""
+=====================================================================""".format(len(BURPEE_V5))
     return legend
 
 LEGENDE = generate_legend()
