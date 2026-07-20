@@ -58,3 +58,5 @@ You should now be all set to execute the main programs for each task!
 mjpython v5train.py
 than
 mjpython v5watch.py
+or
+python v5vid.py
