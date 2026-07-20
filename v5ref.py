@@ -216,7 +216,7 @@ BURPEE_V5 = [
             0,    # left_hip_z
             0,    # left_hip_y
             -5,   # left_knee
-            -20 # right_shoulder1
+            -20, # right_shoulder1
             -35,    # right_shoulder2
             -70,   # right_elbow
             20, # left_shoulder1
