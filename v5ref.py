@@ -56,16 +56,16 @@ BURPEE_V5 = [
         "root_euler": [0, 5, 0],
         "joints": [
             0,    # abdomen_z
-            0,    # abdomen_y
-            10,   # abdomen_x: Oberkörper leicht nach vorne
+            10,    # abdomen_y
+            0,   # abdomen_x: 
             0,    # right_hip_x: neutral
-            0,    # right_hip_z
-            0,    # right_hip_y
-            -60,  # right_knee: NEGATIV = Knie beugen
+            -5,    # right_hip_z
+            -75,    # right_hip_y
+            -140,  # right_knee: NEGATIV = Knie beugen
             0,    # left_hip_x: neutral
-            0,    # left_hip_z
-            0,    # left_hip_y
-            -60,  # left_knee: NEGATIV = Knie beugen
+            -5,    # left_hip_z
+            -75,    # left_hip_y
+            -140,  # left_knee: NEGATIV = Knie beugen
             10,   # right_shoulder1
             0,    # right_shoulder2
             -20,  # right_elbow
@@ -81,22 +81,22 @@ BURPEE_V5 = [
         "root_euler": [0, 45, 0],
         "joints": [
             0,    # abdomen_z
-            0,    # abdomen_y
-            30,   # abdomen_x: Oberkörper nach vorne
-            0,    # right_hip_x
-            0,    # right_hip_z
-            0,    # right_hip_y
-            -90,  # right_knee: stark beugen
-            0,    # left_hip_x
-            0,    # left_hip_z
-            0,    # left_hip_y
-            -90,  # left_knee: stark beugen
-            -90,  # right_shoulder1
-            20,   # right_shoulder2
-            -90,  # right_elbow
-            -90,  # left_shoulder1
-            -20,  # left_shoulder2
-            -90   # left_elbow
+            10,    # abdomen_y
+            0,   # abdomen_x: 
+            0,    # right_hip_x: neutral
+            -5,    # right_hip_z
+            -75,    # right_hip_y
+            -140,  # right_knee: NEGATIV = Knie beugen
+            0,    # left_hip_x: neutral
+            -5,    # left_hip_z
+            -75,    # left_hip_y
+            -140,  # left_knee: NEGATIV = Knie beugen
+            10,   # right_shoulder1
+            0,    # right_shoulder2
+            -20,  # right_elbow
+            10,   # left_shoulder1
+            0,    # left_shoulder2
+            -20   # left_elbow
         ]
     },
     {
@@ -106,7 +106,7 @@ BURPEE_V5 = [
         "root_euler": [0, 85, 0],
         "joints": [
             0,    # abdomen_z
-            0,    # abdomen_y
+            -10,    # abdomen_y
             0,    # abdomen_x
             0,    # right_hip_x
             0,    # right_hip_z
@@ -116,12 +116,62 @@ BURPEE_V5 = [
             0,    # left_hip_z
             0,    # left_hip_y
             -5,   # left_knee: fast gestreckt
-            -110, # right_shoulder1
-            0,    # right_shoulder2
-            -5,   # right_elbow: fast gestreckt
-            -110, # left_shoulder1
-            0,    # left_shoulder2
-            -5    # left_elbow: fast gestreckt
+            25, # right_shoulder1
+            55,    # right_shoulder2
+            -15,   # right_elbow: fast gestreckt
+            -25, # left_shoulder1
+            -55,    # left_shoulder2
+            -15    # left_elbow: fast gestreckt
+        ]
+    },
+    {
+        "name": "right_arm_push_up_ready",
+        "duration": 1.5,
+        "root_pos": [0.4, 0.0, 0.35],
+        "root_euler": [0, 85, 0],
+        "joints": [
+            0,    # abdomen_z
+            -10,    # abdomen_y
+            0,    # abdomen_x
+            0,    # right_hip_x
+            0,    # right_hip_z
+            0,    # right_hip_y
+            -5,   # right_knee: fast gestreckt
+            0,    # left_hip_x
+            0,    # left_hip_z
+            0,    # left_hip_y
+            -5,   # left_knee: fast gestreckt
+            25, # right_shoulder1
+            55,    # right_shoulder2
+            -15,   # right_elbow: fast gestreckt
+            -25, # left_shoulder1
+            -55,    # left_shoulder2
+            -15    # left_elbow: fast gestreckt
+        ]
+    },
+    {
+        "name": "push_up_ready",
+        "duration": 1.5,
+        "root_pos": [0.4, 0.0, 0.35],
+        "root_euler": [0, 85, 0],
+        "joints": [
+            0,    # abdomen_z
+            0,    # abdomen_y
+            5,    # abdomen_x
+            0,    # right_hip_x
+            0,    # right_hip_z
+            0,    # right_hip_y
+            -5,   # right_knee
+            0,    # left_hip_x
+            0,    # left_hip_z
+            0,    # left_hip_y
+            -5,   # left_knee
+            -130, # right_shoulder1
+            20,   # right_shoulder2
+            -100, # right_elbow: stark gebeugt
+            -130, # left_shoulder1
+            -20,  # left_shoulder2
+            -100  # left_elbow: stark gebeugt
         ]
     },
     {
