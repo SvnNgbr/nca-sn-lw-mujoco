@@ -2,7 +2,8 @@ import gymnasium as gym
 import mujoco
 import numpy as np
 import time
-from PIL import Image
+import cv2
+import os
 from v5.v5ref import BURPEE_V5, JOINT_NAMES_V5, deg
 
 def quat_from_euler_xyz(euler_deg):
@@ -34,12 +35,14 @@ def apply_pose_stable(model, data, pose, joint_qpos, root_addr):
     mujoco.mj_forward(model, data)
 
 def main():
-    # Video Einstellungen
-    WIDTH = 800
-    HEIGHT = 600
+    # Video settings
     FPS = 30
-    TOTAL_DURATION = 8.0  # 3 Durchläufe a ca. 2.6s
+    RUNS = 3  # Number of burpee cycles
     FRAME_INTERVAL = 1.0 / FPS
+    
+    # Create videos directory
+    os.makedirs("videos", exist_ok=True)
+    video_name = time.strftime("videos/burpee_v5_%Y%m%d_%H%M%S.mp4")
     
     env = gym.make("Humanoid-v5", render_mode="rgb_array")
     obs, info = env.reset()
@@ -47,7 +50,7 @@ def main():
     model = env.unwrapped.model
     data = env.unwrapped.data
     
-    # Joints finden
+    # Find joints
     joint_qpos = []
     for name in JOINT_NAMES_V5:
         try:
@@ -58,32 +61,50 @@ def main():
     
     valid_qpos = [q for q in joint_qpos if q >= 0]
     
-    # Root finden
+    # Find root
     root_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, "root")
     root_addr = model.jnt_qposadr[root_id]
     
-    # Gesamtdauer einer Pose
+    # Total duration of one cycle
     total_pose_duration = sum(p["duration"] for p in BURPEE_V5)
-    total_video_duration = total_pose_duration * 3  # 3 Durchläufe
+    total_video_duration = total_pose_duration * RUNS
     
-    print(f"Video Laenge: {total_video_duration:.1f} Sekunden")
-    print(f"Frame Rate: {FPS} FPS")
-    print(f"Gesamt Frames: {int(total_video_duration * FPS)}")
-    print("Erstelle Video... (das kann etwas dauern)")
+    print(f"Video duration: {total_video_duration:.1f} seconds")
+    print(f"Frame rate: {FPS} FPS")
+    print(f"Total frames: {int(total_video_duration * FPS)}")
+    print(f"Output: {video_name}")
+    print("Generating video... (this may take a moment)")
     
-    frames = []
+    # Get first frame for video dimensions
+    frame = env.render()
+    if frame is None:
+        print("Error: Could not get frame from environment.")
+        env.close()
+        return
+    
+    height, width = frame.shape[:2]
+    
+    # Initialize video writer
+    video = cv2.VideoWriter(
+        video_name,
+        cv2.VideoWriter_fourcc(*"mp4v"),
+        FPS,
+        (width, height)
+    )
+    
+    frame_count = 0
     t = 0.0
     
-    # 3 Durchläufe
-    for run in range(3):
-        print(f"Durchlauf {run+1}/3")
+    # Run through the burpee sequence RUNS times
+    for run in range(RUNS):
+        print(f"Run {run+1}/{RUNS}")
         
-        # Reset am Anfang jedes Durchlaufs
+        # Reset at start of each run
         obs, info = env.reset()
         
-        # Pose durchlaufen
+        # Run through one full cycle
         while t < total_pose_duration:
-            # Aktuelle Pose berechnen
+            # Find current pose
             cursor = 0.0
             for idx, keyframe in enumerate(BURPEE_V5):
                 next_keyframe = BURPEE_V5[(idx + 1) % len(BURPEE_V5)]
@@ -92,7 +113,7 @@ def main():
                 if cursor <= t < cursor + segment_duration:
                     alpha = (t - cursor) / segment_duration
                     
-                    # Pose interpolieren
+                    # Interpolate pose
                     pose = {
                         "name": keyframe["name"],
                         "root_pos": (1 - alpha) * np.array(keyframe["root_pos"]) + alpha * np.array(next_keyframe["root_pos"]),
@@ -100,15 +121,17 @@ def main():
                         "joints": (1 - alpha) * np.array(keyframe["joints"]) + alpha * np.array(next_keyframe["joints"])
                     }
                     
-                    # Pose anwenden
+                    # Apply pose
                     apply_pose_stable(model, data, pose, valid_qpos, root_addr)
                     
-                    # Render Frame
+                    # Render frame
                     frame = env.render()
                     if frame is not None:
-                        frames.append(frame)
+                        frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+                        video.write(frame_bgr)
+                        frame_count += 1
                     
-                    # MuJoCo Step
+                    # MuJoCo step
                     for _ in range(5):
                         mujoco.mj_step(model, data)
                     
@@ -117,31 +140,20 @@ def main():
             
             t += FRAME_INTERVAL
             
-            # Fortschritt anzeigen
-            if len(frames) % 100 == 0:
-                progress = (run * total_pose_duration + t) / (3 * total_pose_duration) * 100
-                print(f"  Progress: {progress:.1f}%")
+            # Show progress
+            if frame_count % 100 == 0:
+                progress = (run * total_pose_duration + t) / (RUNS * total_pose_duration) * 100
+                print(f"  Progress: {progress:.1f}% (frames: {frame_count})")
         
-        t = 0.0  # Reset für nächsten Durchlauf
+        t = 0.0  # Reset for next run
     
-    # Video speichern
-    print(f"\nSpeichere Video mit {len(frames)} Frames...")
-    
-    if frames:
-        from PIL import Image
-        frames_pil = [Image.fromarray(frame) for frame in frames]
-        frames_pil[0].save(
-            "burpee_v5.gif",
-            save_all=True,
-            append_images=frames_pil[1:],
-            duration=int(1000 / FPS),
-            loop=0
-        )
-        print("Video gespeichert als: burpee_v5.gif")
-    else:
-        print("Keine Frames erstellt!")
-    
+    # Cleanup
+    video.release()
     env.close()
+    
+    print(f"\nVideo saved: {video_name}")
+    print(f"Total frames: {frame_count}")
+    print(f"File size: {os.path.getsize(video_name) / (1024*1024):.1f} MB")
 
 if __name__ == "__main__":
     main()
