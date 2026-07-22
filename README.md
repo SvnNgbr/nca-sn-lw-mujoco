@@ -56,26 +56,27 @@ You should now be all set to execute the main programs for each task!
 
 # How to run:
 
-# V5 training + video (standard)
-
+ V5 training + video (standard)
+```bash
 python run.py
-
-# only V5 training
-
+```
+only V5 training
+```bash
 python run.py --mode train
-
-# only V5 video with prev. existing modell
-
+```
+only V5 video with prev. existing modell
+```bash
 python run.py --mode video --skip-train
-
-# V3 training + video
-
+```
+V3 training + video
+```bash
 python run.py --version v3
-
-# V3 video with root-Assist
-
+```
+V3 video with root-Assist
+```bash
 python run.py --version v3 --mode video --skip-train --root-assist 0.5
-
-# V5 video with root-Assist
-
+```
+V5 video with root-Assist
+```bash
 python run.py --mode video --skip-train --root-assist 0.5
+```
