@@ -7,10 +7,11 @@ MODEL_DIR = Path("trained_models_humanoid_v5")
 MODEL_DIR.mkdir(exist_ok=True)
 
 STAGES = [
-    {"name": "teacher_strong", "root_assist": 0.98, "steps": 300_000},
-    {"name": "teacher_medium", "root_assist": 0.75, "steps": 500_000},
-    {"name": "teacher_light", "root_assist": 0.45, "steps": 700_000},
-    {"name": "teacher_none", "root_assist": 0.0, "steps": 1_000_000},
+    {"name": "teacher_full", "root_assist": 0.99, "steps": 200_000, "hold": 0.5, "threshold": 1.0},
+    {"name": "teacher_strong", "root_assist": 0.95, "steps": 300_000, "hold": 0.8, "threshold": 0.7},
+    {"name": "teacher_medium", "root_assist": 0.80, "steps": 500_000, "hold": 1.0, "threshold": 0.5},
+    {"name": "teacher_light", "root_assist": 0.50, "steps": 700_000, "hold": 1.5, "threshold": 0.4},
+    {"name": "teacher_none", "root_assist": 0.0, "steps": 1_000_000, "hold": 2.0, "threshold": 0.3},
 ]
 
 def make_env(root_assist):

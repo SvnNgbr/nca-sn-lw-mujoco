@@ -14,9 +14,9 @@ class BurpeeHumanoidV5Env(gym.Env):
         random_start=False,
         root_assist=0.9,
         action_scale=0.45,
-        hold_seconds=3.0,
-        pose_threshold=0.3,
-        max_steps_per_phase=600,
+        hold_seconds=1.0,
+        pose_threshold=0.5,
+        max_steps_per_phase=9999, #test cuz training wasnt working
     ):
         super().__init__()
         
@@ -36,7 +36,6 @@ class BurpeeHumanoidV5Env(gym.Env):
         self.elapsed = 0.0
         self.previous_action = np.zeros(self.model.nu, dtype=np.float32)
         
-        # Phasen-basiert
         self.phase_idx = 0
         self.phase_start_time = 0.0
         self.phase_hold_time = 0.0
@@ -44,7 +43,6 @@ class BurpeeHumanoidV5Env(gym.Env):
         self.pose_held = False
         self.phase_complete = False
 
-        # Joint-IDs
         self.joint_ids = []
         self.joint_qpos = []
         self.joint_qvel = []
@@ -110,15 +108,24 @@ class BurpeeHumanoidV5Env(gym.Env):
         pose = self._get_target_pose(self.phase_idx)
         amount = np.clip(self.root_assist, 0.0, 1.0)
         
+        # Root-Position korrigieren
         target_root_pos = np.array(pose["root_pos"])
         target_root_quat = self._quat_from_euler(pose["root_euler"])
-        
         root_slice = slice(self.root_qpos, self.root_qpos + 7)
         target_root = np.concatenate([target_root_pos, target_root_quat])
         self.data.qpos[root_slice] = (
             (1.0 - amount) * self.data.qpos[root_slice] + amount * target_root
         )
         self.data.qvel[self.root_qvel:self.root_qvel+6] *= 1.0 - amount * 0.5
+        
+        #Auch Gelenkwinkel assistieren
+        target_joints = deg(pose["joints"])
+        for i, qpos_addr in enumerate(self.joint_qpos):
+            if i < len(target_joints):
+                self.data.qpos[qpos_addr] = (
+                    (1.0 - amount) * self.data.qpos[qpos_addr] + amount * target_joints[i]
+                )
+        self.data.qvel[self.joint_qvel] *= 1.0 - amount * 0.5
 
     def _quat_from_euler(self, euler_deg):
         roll, pitch, yaw = np.radians(euler_deg)
@@ -198,60 +205,52 @@ class BurpeeHumanoidV5Env(gym.Env):
         self.phase_steps += 1
         self._apply_root_assist()
 
-        # Prüfen ob die Pose erreicht wurde
         pose = self._get_target_pose(self.phase_idx)
         target_joints = deg(pose["joints"])
         joint_error = self.data.qpos[self.joint_qpos] - target_joints
         pose_error = np.mean(joint_error * joint_error)
         
-        # Pose gut?
-        is_pose_good = pose_error < self.pose_threshold
-        
-        # Höhe gut?
         root_height = self.data.qpos[self.root_qpos+2]
         target_height = pose["root_pos"][2]
         height_error = abs(root_height - target_height)
-        is_height_good = height_error < 0.15
         
-        # Stabil? (Geschwindigkeit niedrig)
-        joint_vel = self.data.qvel[self.joint_qvel]
-        is_stable = np.mean(joint_vel * joint_vel) < 5.0
+        # Sehr lockere Bedingungen
+        is_pose_good = pose_error < self.pose_threshold
+        is_height_good = height_error < 0.3
         
-        # Alle Bedingungen erfüllt?
-        is_pose_achieved = is_pose_good and is_height_good and is_stable
+        is_pose_achieved = is_pose_good and is_height_good
         
-        # Halte-Timer
         if is_pose_achieved:
             self.phase_hold_time += self.dt
             if self.phase_hold_time >= self.hold_seconds:
                 self.pose_held = True
                 self.phase_complete = True
         else:
-            # Bei Fehler: Timer zurücksetzen (muss kontinuierlich halten)
-            if self.phase_hold_time > 0:
-                self.phase_hold_time = max(0, self.phase_hold_time - self.dt * 2)
-            if self.phase_hold_time < 0.1:
-                self.pose_held = False
+            self.phase_hold_time = max(0, self.phase_hold_time - self.dt)
 
-        # Belohnung
         reward = self._compute_reward(action, ctrl, pose_error, height_error)
         self.previous_action = action.copy()
         
-        # Phase wechseln wenn erfolgreich gehalten ODER zu lange
+        # Phasenwechsel Logik
         if self.phase_complete or self.phase_steps > self.max_steps_per_phase:
-            if not self.phase_complete and self.phase_steps > self.max_steps_per_phase:
+            if self.phase_complete:
+                print(f"✅ Phase {BURPEE_V5[self.phase_idx]['name']} COMPLETED! (hold_time: {self.phase_hold_time:.2f}s)")
+            else:
                 reward -= 5.0
-                print(f"⚠️ Phase {BURPEE_V5[self.phase_idx]['name']} timed out!")
+                print(f"⚠️ Phase {BURPEE_V5[self.phase_idx]['name']} timed out! (steps: {self.phase_steps})")
             
+            # Phase wechseln
+            old_phase = self.phase_idx
             self.phase_idx = (self.phase_idx + 1) % len(BURPEE_V5)
             self.phase_start_time = self.elapsed
             self.phase_hold_time = 0.0
             self.phase_steps = 0
             self.pose_held = False
             self.phase_complete = False
-            
-            print(f"➡️ Phase: {BURPEE_V5[self.phase_idx]['name']}")
             self._apply_target_pose(self.phase_idx)
+            
+            # Zeige die neue Phase an
+            print(f"➡️ New phase: {BURPEE_V5[self.phase_idx]['name']}")
         
         terminated = root_height < 0.05
         truncated = self.phase_idx == 0 and self.phase_steps > 50 and self.elapsed > 10.0
@@ -264,8 +263,6 @@ class BurpeeHumanoidV5Env(gym.Env):
             "pose_held": self.pose_held,
             "phase_complete": self.phase_complete,
             "hold_time": self.phase_hold_time,
-            "is_pose_good": is_pose_good,
-            "is_stable": is_stable
         }
 
     def _compute_reward(self, action, ctrl, pose_error, height_error):
@@ -283,6 +280,7 @@ class BurpeeHumanoidV5Env(gym.Env):
         
         root_height = self.data.qpos[self.root_qpos+2]
         alive_bonus = 0.5 if root_height > 0.15 else -1.0
+        control_cost = -0.01 * np.mean(ctrl * ctrl)
         
         return (2.0 * pose_reward + 
                 1.0 * height_reward + 
@@ -290,7 +288,8 @@ class BurpeeHumanoidV5Env(gym.Env):
                 0.25 * smooth_reward +
                 hold_bonus +
                 phase_bonus +
-                alive_bonus)
+                alive_bonus +
+                control_cost)
 
     def close(self):
         self.env.close()
