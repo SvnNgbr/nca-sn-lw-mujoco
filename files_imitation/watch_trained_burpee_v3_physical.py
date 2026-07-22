@@ -6,21 +6,21 @@ import mujoco
 import mujoco.viewer
 from stable_baselines3 import PPO
 
-from imitationv2.burpee_imitation_env_v2 import BurpeeImitationEnvV2
+from burpee_imitation_env_v3_physical import BurpeeImitationEnvV3Physical
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--model",
-        default="trained_models/burpee_ppo_curriculum.zip",
+        default="trained_models/burpee_v3_physical.zip",
         help="Path to the trained .zip model.",
     )
     parser.add_argument(
-        "--root-assist",
+        "--weak-root-assist",
         type=float,
-        default=0.45,
-        help="Teacher assistance while watching. Try 0.98, 0.75, 0.45, then 0.0.",
+        default=0.0,
+        help="Small playback assist. Use 0.0 to check the real physical result.",
     )
     args = parser.parse_args()
 
@@ -28,10 +28,10 @@ def main():
     if not model_path.exists():
         raise FileNotFoundError(f"No trained model found at {model_path}")
 
-    env = BurpeeImitationEnvV2(
-        model_path="humanoid_burpee_learning.xml",
+    env = BurpeeImitationEnvV3Physical(
+        model_path="humanoid_burpee_v3.xml",
         random_start=False,
-        root_assist=args.root_assist,
+        weak_root_assist=args.weak_root_assist,
     )
     policy = PPO.load(model_path)
     obs, _ = env.reset()

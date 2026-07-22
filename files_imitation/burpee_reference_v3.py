@@ -1,13 +1,7 @@
 import math
-import time
-from pathlib import Path
 
-import mujoco
-import mujoco.viewer
 import numpy as np
 
-
-MODEL_PATH = Path(__file__).with_name("humanoid_burpee_v3.xml")
 
 JOINT_NAMES = [
     "left_shoulder_roll",
@@ -26,13 +20,9 @@ JOINT_NAMES = [
 
 
 def deg(values):
-    return np.radians(np.array(values, dtype=float))
+    return np.radians(np.array(values, dtype=np.float32))
 
 
-# v3 parallel arms:
-# The shoulder roll stays close to neutral while the robot goes down.
-# This prevents the forearms from crossing in front of the chest. The elbows
-# only open slightly outward in the low push-up phase.
 BURPEE = [
     {
         "name": "stand",
@@ -100,6 +90,11 @@ BURPEE = [
 ]
 
 
+TOTAL_DURATION = sum(frame["duration"] for frame in BURPEE)
+FLOOR_PHASES = {"hands_to_floor", "plank", "push_up_down", "push_up_up", "feet_forward"}
+PUSHUP_PHASES = {"plank", "push_up_down", "push_up_up"}
+
+
 def quat_from_euler_xyz(euler_deg):
     roll, pitch, yaw = np.radians(euler_deg)
     cr, sr = math.cos(roll / 2), math.sin(roll / 2)
@@ -111,7 +106,8 @@ def quat_from_euler_xyz(euler_deg):
             sr * cp * cy - cr * sp * sy,
             cr * sp * cy + sr * cp * sy,
             cr * cp * sy - sr * sp * cy,
-        ]
+        ],
+        dtype=np.float32,
     )
 
 
@@ -120,63 +116,35 @@ def smoothstep(x):
     return x * x * (3.0 - 2.0 * x)
 
 
-def interpolate_pose(a, b, alpha):
-    t = smoothstep(alpha)
-    root_pos = (1.0 - t) * np.array(a["root_pos"]) + t * np.array(b["root_pos"])
-    joints = (1.0 - t) * a["joints"] + t * b["joints"]
-    euler = (1.0 - t) * np.array(a["root_euler"]) + t * np.array(b["root_euler"])
-    return root_pos, quat_from_euler_xyz(euler), joints
-
-
-def apply_scripted_root(model, data, root_pos, root_quat):
-    root_joint_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, "root")
-    qpos_addr = model.jnt_qposadr[root_joint_id]
-    qvel_addr = model.jnt_dofadr[root_joint_id]
-    data.qpos[qpos_addr : qpos_addr + 3] = root_pos
-    data.qpos[qpos_addr + 3 : qpos_addr + 7] = root_quat
-    data.qvel[qvel_addr : qvel_addr + 6] = 0.0
-
-
-def main():
-    model = mujoco.MjModel.from_xml_path(str(MODEL_PATH))
-    data = mujoco.MjData(model)
-
-    joint_ids = [
-        mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, name)
-        for name in JOINT_NAMES
-    ]
-    qpos_addrs = [model.jnt_qposadr[joint_id] for joint_id in joint_ids]
-
-    with mujoco.viewer.launch_passive(model, data) as viewer:
-        viewer.cam.distance = 3.0
-        viewer.cam.azimuth = 135
-        viewer.cam.elevation = -18
-        viewer.cam.lookat[:] = [0.2, 0.0, 0.65]
-
-        frame_start = time.time()
-        while viewer.is_running():
-            elapsed = (time.time() - frame_start) % sum(k["duration"] for k in BURPEE)
-
-            cursor = 0.0
-            for index, keyframe in enumerate(BURPEE):
-                next_keyframe = BURPEE[(index + 1) % len(BURPEE)]
-                segment_duration = keyframe["duration"]
-                if cursor <= elapsed < cursor + segment_duration:
-                    alpha = (elapsed - cursor) / segment_duration
-                    root_pos, root_quat, joints = interpolate_pose(
-                        keyframe, next_keyframe, alpha
-                    )
-                    data.ctrl[:] = joints
-                    for qpos_addr, joint_value in zip(qpos_addrs, joints):
-                        data.qpos[qpos_addr] = joint_value
-                    apply_scripted_root(model, data, root_pos, root_quat)
-                    break
-                cursor += segment_duration
-
-            mujoco.mj_step(model, data)
-            viewer.sync()
-            time.sleep(model.opt.timestep)
-
-
-if __name__ == "__main__":
-    main()
+def reference_at(time_seconds):
+    t_abs = float(time_seconds) % TOTAL_DURATION
+    cursor = 0.0
+    for index, frame in enumerate(BURPEE):
+        next_frame = BURPEE[(index + 1) % len(BURPEE)]
+        duration = frame["duration"]
+        if cursor <= t_abs < cursor + duration:
+            alpha = smoothstep((t_abs - cursor) / duration)
+            root_pos = (1.0 - alpha) * np.array(frame["root_pos"]) + alpha * np.array(
+                next_frame["root_pos"]
+            )
+            root_euler = (1.0 - alpha) * np.array(frame["root_euler"]) + alpha * np.array(
+                next_frame["root_euler"]
+            )
+            joints = (1.0 - alpha) * frame["joints"] + alpha * next_frame["joints"]
+            return {
+                "phase": np.array(
+                    [
+                        math.sin(2 * math.pi * t_abs / TOTAL_DURATION),
+                        math.cos(2 * math.pi * t_abs / TOTAL_DURATION),
+                    ],
+                    dtype=np.float32,
+                ),
+                "root_pos": root_pos.astype(np.float32),
+                "root_quat": quat_from_euler_xyz(root_euler),
+                "joints": joints.astype(np.float32),
+                "name": frame["name"],
+                "needs_hand_support": frame["name"] in FLOOR_PHASES,
+                "is_pushup": frame["name"] in PUSHUP_PHASES,
+            }
+        cursor += duration
+    return reference_at(0.0)

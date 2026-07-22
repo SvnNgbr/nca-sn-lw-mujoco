@@ -80,12 +80,12 @@ def main():
 
     if args.version == "v3":
         script_dir = base_dir / "files_imitationv2"
-        train_script = "train_burpee_curriculum.py"
-        watch_script = "watch_trained_burpee_v2.py"
+        train_script = "train_burpee_v3_physical.py"
+        watch_script = "watch_trained_burpee_v3_physical.py"
         video_script = "burpee_robot_v3_parallel_arms.py"
         tensorprint_script = "tensorprint.py"
-        model_prefix = "burpee_ppo_curriculum"
-        run_dir = script_dir / "runs_curriculum"
+        model_prefix = "burpee_v3_physical"
+        run_dir = script_dir / "runs_v3_physical"
         models_dir = script_dir / "trained_models"
         videos_dir = script_dir / "videos"
         plots_dir = script_dir / "training_plots"
@@ -151,14 +151,13 @@ def main():
                     sys.exit(1)
 
     # ============================================================
-    # 3. VIDEO GENERIEREN (headless, kein mjpython)
+    # 3. VIDEO GENERIEREN
     # ============================================================
     if args.mode in ["video", "both", "all"]:
         print_header(f"GENERATING VIDEO ({args.version.upper()})")
         print(f"Model: {model_path}")
         print(f"Root assist: {args.root_assist}")
 
-        # WICHTIG: Video mit normalem python, NICHT mjpython!
         video_cmd = [
             "python", video_script,
             "--model", str(model_path),
