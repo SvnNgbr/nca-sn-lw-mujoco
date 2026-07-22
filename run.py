@@ -79,7 +79,7 @@ def main():
     print_header(f"BURPEE TRAINING - Version: {args.version.upper()} - Run: {run_name}")
 
     if args.version == "v3":
-        script_dir = base_dir / "files_imitationv2"
+        script_dir = base_dir / "files_imitation"
         train_script = "train_burpee_v3_physical.py"
         watch_script = "watch_trained_burpee_v3_physical.py"
         video_script = "burpee_robot_v3_parallel_arms.py"

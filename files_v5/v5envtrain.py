@@ -93,6 +93,8 @@ class BurpeeHumanoidV5Env(gym.Env):
     def render(self):
         if self.render_mode == "human":
             return self.env.render()
+        elif self.render_mode == "rgb_array":
+            return self.env.render()
         return None
 
     def _reference_control(self):

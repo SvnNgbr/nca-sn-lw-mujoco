@@ -1,223 +1,121 @@
+import gymnasium as gym
+import mujoco
+import numpy as np
+import time
+import cv2
 import os
 import argparse
-import numpy as np
-import matplotlib.pyplot as plt
-from pathlib import Path
-from tensorboard.backend.event_processing import event_accumulator
+from stable_baselines3 import PPO
+from v5ref import BURPEE_V5, JOINT_NAMES_V5, deg
+from v5envtrain import BurpeeHumanoidV5Env
 
-def find_event_files(logdir):
-    event_files = []
-    for root, dirs, files in os.walk(logdir):
-        for f in files:
-            if f.startswith("events.out.tfevents"):
-                event_files.append(os.path.join(root, f))
-    return event_files
-
-def extract_tb_data(event_file, tags):
-    ea = event_accumulator.EventAccumulator(event_file)
-    ea.Reload()
-    
-    print("\nAvailable scalar tags:")
-    if 'scalars' in ea.Tags():
-        for tag in sorted(ea.Tags()['scalars']):
-            print(f"  {tag}")
-    print()
-    
-    data = {}
-    for tag in tags:
-        if tag in ea.Tags()['scalars']:
-            events = ea.Scalars(tag)
-            if events:
-                data[tag] = {
-                    "steps": np.array([e.step for e in events]),
-                    "values": np.array([e.value for e in events])
-                }
-                print(f"Loaded {tag}: {len(events)} points")
-        else:
-            print(f"Tag not found: {tag}")
-    
-    return data
-
-def smooth_data(values, window=20):
-    if len(values) < window:
-        return values
-    return np.convolve(values, np.ones(window)/window, mode='valid')
-
-def plot_metrics(data, output_dir, run_name, window=20):
-    fig, axes = plt.subplots(2, 2, figsize=(12, 10))
-    fig.suptitle(f"Training Metrics - {run_name}", fontsize=16, fontweight="bold")
-    
-    # Definiere die 4 Metriken, die geplottet werden sollen
-    metrics = [
-        ("rollout/ep_rew_mean", "Episode Reward", "Reward", "#1f77b4"),
-        ("rollout/ep_len_mean", "Episode Length", "Steps", "#ff7f0e"),
-        ("train/learning_rate", "Learning Rate", "Rate", "#2ca02c"),
-        ("time/fps", "Frames per Second (FPS)", "FPS", "#d62728"),
-    ]
-    
-    plot_idx = 0
-    for tag, title, ylabel, color in metrics:
-        row = plot_idx // 2
-        col = plot_idx % 2
-        ax = axes[row, col]
-        
-        # Versuche alternative Tag-Namen
-        found = False
-        for alt_tag in [tag, tag.split('/')[-1]]:
-            if alt_tag in data and len(data[alt_tag]["steps"]) > 0:
-                d = data[alt_tag]
-                found = True
-                break
-        
-        if not found:
-            ax.text(0.5, 0.5, f"No data for {title}", 
-                   horizontalalignment='center', verticalalignment='center',
-                   transform=ax.transAxes, fontsize=12, color='gray')
-            ax.set_title(title)
-            ax.set_visible(True)
-            plot_idx += 1
-            continue
-        
-        steps = d["steps"]
-        values = d["values"]
-        
-        # Raw data
-        ax.plot(steps, values, linewidth=1, color=color, alpha=0.4, label="Raw")
-        
-        # Smoothed data
-        if len(values) > window:
-            smoothed = smooth_data(values, window)
-            smooth_steps = steps[:len(smoothed)]
-            ax.plot(smooth_steps, smoothed, linewidth=2, color=color, 
-                   label=f"Smoothed (n={window})")
-        
-        ax.set_xlabel("Timesteps", fontsize=11)
-        ax.set_ylabel(ylabel, fontsize=11)
-        ax.set_title(title, fontsize=13, fontweight="bold")
-        ax.legend(loc="best", fontsize=9)
-        ax.grid(True, alpha=0.3)
-        
-        plot_idx += 1
-    
-    plt.tight_layout()
-    
-    png_path = output_dir / f"{run_name}_metrics.png"
-    pdf_path = output_dir / f"{run_name}_metrics.pdf"
-    plt.savefig(png_path, dpi=200, bbox_inches="tight")
-    plt.savefig(pdf_path, bbox_inches="tight")
-    plt.close()
-    
-    return png_path, pdf_path
-
-def generate_summary(data, output_dir, run_name):
-    summary_path = output_dir / f"{run_name}_summary.txt"
-    
-    with open(summary_path, "w") as f:
-        f.write(f"Training Summary - {run_name}\n")
-        f.write("="*60 + "\n\n")
-        
-        for tag, d in data.items():
-            if len(d["values"]) > 0:
-                final_val = d["values"][-1]
-                mean_val = np.mean(d["values"])
-                max_val = np.max(d["values"])
-                min_val = np.min(d["values"])
-                
-                f.write(f"{tag}:\n")
-                f.write(f"  Final: {final_val:.4f}\n")
-                f.write(f"  Mean:  {mean_val:.4f}\n")
-                f.write(f"  Max:   {max_val:.4f}\n")
-                f.write(f"  Min:   {min_val:.4f}\n")
-                f.write("\n")
-        
-        f.write("="*60 + "\n")
+def quat_from_euler_xyz(euler_deg):
+    roll, pitch, yaw = np.radians(euler_deg)
+    cr, sr = np.cos(roll/2), np.sin(roll/2)
+    cp, sp = np.cos(pitch/2), np.sin(pitch/2)
+    cy, sy = np.cos(yaw/2), np.sin(yaw/2)
+    return np.array([
+        cr*cp*cy + sr*sp*sy,
+        sr*cp*cy - cr*sp*sy,
+        cr*sp*cy + sr*cp*sy,
+        cr*cp*sy - sr*sp*cy
+    ])
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Generate training plots and summaries from TensorBoard logs."
-    )
-    parser.add_argument(
-        "--logdir",
-        type=str,
-        default="runs_humanoid_v5",
-        help="Directory containing TensorBoard logs"
-    )
-    parser.add_argument(
-        "--run-name",
-        type=str,
-        default=None,
-        help="Name for the run (used in output filenames)"
-    )
-    parser.add_argument(
-        "--output-dir",
-        type=str,
-        default="training_plots",
-        help="Directory to save plots and summaries"
-    )
-    parser.add_argument(
-        "--window",
-        type=int,
-        default=20,
-        help="Window size for smoothing"
-    )
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--model", type=str, required=True, help="Path to trained model")
+    parser.add_argument("--root-assist", type=float, default=0.0, help="Root assist for video")
+    parser.add_argument("--runs", type=int, default=3, help="Number of burpee cycles")
+    parser.add_argument("--fps", type=int, default=30, help="Frames per second")
     args = parser.parse_args()
     
-    base_dir = Path(__file__).parent.parent.absolute()
-    logdir = Path(args.logdir)
-    if not logdir.is_absolute():
-        logdir = base_dir / logdir
+    # Video settings
+    FPS = args.fps
+    RUNS = args.runs
+    FRAME_INTERVAL = 1.0 / FPS
     
-    output_dir = base_dir / args.output_dir
-    output_dir.mkdir(exist_ok=True)
+    os.makedirs("videos", exist_ok=True)
+    video_name = time.strftime("videos/burpee_v5_policy_%Y%m%d_%H%M%S.mp4")
     
-    if args.run_name:
-        run_name = args.run_name
+    print(f"Model: {args.model}")
+    print(f"Root assist: {args.root_assist}")
+    print(f"Runs: {RUNS}")
+    print(f"Output: {video_name}")
+    print("Generating video...")
+    
+    # Environment MIT render_mode="rgb_array" für Video
+    env = BurpeeHumanoidV5Env(
+        render_mode="rgb_array",  # <-- WICHTIG: rgb_array für Video
+        random_start=False,
+        root_assist=args.root_assist,
+        hold_seconds=0.5,
+    )
+    
+    policy = PPO.load(args.model)
+    obs, _ = env.reset()
+    
+    # Erstes Frame für Dimensionen
+    frame = env.render()
+    if frame is None:
+        print("Error: Could not get frame. Trying alternative...")
+        # Fallback: Direkt mit gym.make
+        env.close()
+        env = gym.make("Humanoid-v5", render_mode="rgb_array")
+        obs, _ = env.reset()
+        frame = env.render()
+        if frame is None:
+            print("Error: Still could not get frame.")
+            env.close()
+            return
+    
+    height, width = frame.shape[:2]
+    video = cv2.VideoWriter(
+        video_name,
+        cv2.VideoWriter_fourcc(*"mp4v"),
+        FPS,
+        (width, height)
+    )
+    
+    frame_count = 0
+    total_reward = 0.0
+    episode_count = 0
+    
+    try:
+        while episode_count < RUNS:
+            action, _ = policy.predict(obs, deterministic=True)
+            obs, reward, terminated, truncated, info = env.step(action)
+            
+            total_reward += reward
+            frame = env.render()
+            
+            if frame is not None:
+                frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+                video.write(frame_bgr)
+                frame_count += 1
+            else:
+                print(f"Warning: No frame at step {frame_count}")
+            
+            if terminated or truncated:
+                episode_count += 1
+                print(f"Episode {episode_count}/{RUNS} complete. Reward: {total_reward:.2f}")
+                obs, _ = env.reset()
+                total_reward = 0.0
+            
+            time.sleep(FRAME_INTERVAL)
+            
+    except KeyboardInterrupt:
+        print("Interrupted...")
+    finally:
+        video.release()
+        env.close()
+    
+    if frame_count > 0:
+        file_size = os.path.getsize(video_name) / (1024*1024)
+        print(f"\nVideo saved: {video_name}")
+        print(f"Total frames: {frame_count}")
+        print(f"File size: {file_size:.1f} MB")
     else:
-        run_name = logdir.name
-    
-    print(f"Processing logs from: {logdir}")
-    print(f"Output directory: {output_dir}")
-    print(f"Run name: {run_name}")
-    
-    event_files = find_event_files(logdir)
-    if not event_files:
-        print(f"No event files found in {logdir}")
-        return
-    
-    latest_event = max(event_files, key=os.path.getmtime)
-    print(f"Using event file: {latest_event}")
-    
-    all_tags = [
-        "rollout/ep_rew_mean",
-        "rollout/ep_len_mean",
-        "train/learning_rate",
-        "time/fps",
-        "ep_rew_mean",
-        "ep_len_mean",
-        "learning_rate",
-        "fps",
-    ]
-    
-    data = extract_tb_data(latest_event, all_tags)
-    
-    if not data:
-        print("No data extracted. Check that the event file contains scalar data.")
-        return
-    
-    png_path, pdf_path = plot_metrics(data, output_dir, run_name, args.window)
-    print(f"\nPlots saved to:")
-    print(f"  PNG: {png_path}")
-    print(f"  PDF: {pdf_path}")
-    
-    generate_summary(data, output_dir, run_name)
-    print(f"Summary saved to: {output_dir / f'{run_name}_summary.txt'}")
-    
-    for tag, d in data.items():
-        if len(d["steps"]) > 0:
-            csv_path = output_dir / f"{run_name}_{tag.replace('/', '_')}.csv"
-            np.savetxt(csv_path, np.column_stack([d["steps"], d["values"]]), 
-                      delimiter=",", header="steps,values", comments="")
-    print(f"Raw data saved as CSV files in: {output_dir}")
+        print("\nNo frames were recorded. Video generation failed.")
 
 if __name__ == "__main__":
     main()
