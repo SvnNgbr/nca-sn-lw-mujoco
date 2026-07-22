@@ -14,9 +14,9 @@ class BurpeeHumanoidV5Env(gym.Env):
         random_start=False,
         root_assist=0.9,
         action_scale=0.45,
-        hold_seconds=2.0,
+        hold_seconds=3.0,
         pose_threshold=0.3,
-        max_steps_per_phase=500,
+        max_steps_per_phase=600,
     ):
         super().__init__()
         
@@ -36,7 +36,7 @@ class BurpeeHumanoidV5Env(gym.Env):
         self.elapsed = 0.0
         self.previous_action = np.zeros(self.model.nu, dtype=np.float32)
         
-        # Phasen-basiert: Tracke die aktuelle Phase
+        # Phasen-basiert
         self.phase_idx = 0
         self.phase_start_time = 0.0
         self.phase_hold_time = 0.0
@@ -73,14 +73,13 @@ class BurpeeHumanoidV5Env(gym.Env):
             dtype=np.float32
         )
         
-        # Observation: Phase-Index hinzufügen
         obs_size = (
             self.model.nq + 
             self.model.nv + 
             len(self.joint_qpos) + 
             3 + 4 + 
             len(self.joint_qpos) + 
-            1  # Phase-Index (normalisiert)
+            1
         )
         self.observation_space = spaces.Box(
             low=-np.inf, high=np.inf, 
@@ -94,11 +93,9 @@ class BurpeeHumanoidV5Env(gym.Env):
         return None
 
     def _get_target_pose(self, idx):
-        """Holt die Zielpose für eine bestimmte Phase"""
         return BURPEE_V5[idx % len(BURPEE_V5)]
 
     def _reference_control(self):
-        """Holt die Referenz für die aktuelle Phase"""
         pose = self._get_target_pose(self.phase_idx)
         return deg(pose["joints"]).astype(np.float32)
 
@@ -136,7 +133,6 @@ class BurpeeHumanoidV5Env(gym.Env):
         ])
 
     def _apply_target_pose(self, idx):
-        """Setzt die Zielpose (für Reset)"""
         pose = self._get_target_pose(idx)
         joints_rad = deg(pose["joints"])
         
@@ -157,7 +153,6 @@ class BurpeeHumanoidV5Env(gym.Env):
         self.elapsed = 0.0
         self.previous_action[:] = 0.0
         
-        # Phasen zurücksetzen
         self.phase_idx = 0
         self.phase_start_time = 0.0
         self.phase_hold_time = 0.0
@@ -178,7 +173,6 @@ class BurpeeHumanoidV5Env(gym.Env):
         target_root_pos = np.array(pose["root_pos"])
         target_root_quat = self._quat_from_euler(pose["root_euler"])
         
-        # Phase als normalisierte Zahl
         phase_norm = self.phase_idx / len(BURPEE_V5)
         
         obs = np.concatenate([
@@ -209,29 +203,46 @@ class BurpeeHumanoidV5Env(gym.Env):
         target_joints = deg(pose["joints"])
         joint_error = self.data.qpos[self.joint_qpos] - target_joints
         pose_error = np.mean(joint_error * joint_error)
+        
+        # Pose gut?
         is_pose_good = pose_error < self.pose_threshold
         
+        # Höhe gut?
         root_height = self.data.qpos[self.root_qpos+2]
         target_height = pose["root_pos"][2]
         height_error = abs(root_height - target_height)
         is_height_good = height_error < 0.15
         
-        # Phase ist erreicht wenn Pose gut UND Höhe gut
-        if is_pose_good and is_height_good:
+        # Stabil? (Geschwindigkeit niedrig)
+        joint_vel = self.data.qvel[self.joint_qvel]
+        is_stable = np.mean(joint_vel * joint_vel) < 5.0
+        
+        # Alle Bedingungen erfüllt?
+        is_pose_achieved = is_pose_good and is_height_good and is_stable
+        
+        # Halte-Timer
+        if is_pose_achieved:
             self.phase_hold_time += self.dt
             if self.phase_hold_time >= self.hold_seconds:
                 self.pose_held = True
                 self.phase_complete = True
         else:
-            self.phase_hold_time = 0.0
-            self.pose_held = False
+            # Bei Fehler: Timer zurücksetzen (muss kontinuierlich halten)
+            if self.phase_hold_time > 0:
+                self.phase_hold_time = max(0, self.phase_hold_time - self.dt * 2)
+            if self.phase_hold_time < 0.1:
+                self.pose_held = False
 
         # Belohnung
         reward = self._compute_reward(action, ctrl, pose_error, height_error)
         self.previous_action = action.copy()
         
-        # Phase wechseln wenn erfolgreich oder zu lange
+        # Phase wechseln wenn erfolgreich gehalten ODER zu lange
         if self.phase_complete or self.phase_steps > self.max_steps_per_phase:
+            if not self.phase_complete and self.phase_steps > self.max_steps_per_phase:
+                reward -= 5.0
+                print(f"⚠️ Phase {BURPEE_V5[self.phase_idx]['name']} timed out!")
+            
             self.phase_idx = (self.phase_idx + 1) % len(BURPEE_V5)
             self.phase_start_time = self.elapsed
             self.phase_hold_time = 0.0
@@ -239,14 +250,11 @@ class BurpeeHumanoidV5Env(gym.Env):
             self.pose_held = False
             self.phase_complete = False
             
-            # Bei neuem Phase-Reset die Pose setzen
+            print(f"➡️ Phase: {BURPEE_V5[self.phase_idx]['name']}")
             self._apply_target_pose(self.phase_idx)
         
-        # Termination: Nur wenn Roboter komplett gefallen ist
         terminated = root_height < 0.05
-        
-        # Episode ist zu Ende wenn alle Phasen einmal durchlaufen wurden
-        truncated = self.phase_idx == 0 and self.phase_steps > self.max_steps_per_phase and self.elapsed > 5.0
+        truncated = self.phase_idx == 0 and self.phase_steps > 50 and self.elapsed > 10.0
         
         return self._get_obs(), float(reward), terminated, truncated, {
             "root_height": float(root_height),
@@ -254,7 +262,10 @@ class BurpeeHumanoidV5Env(gym.Env):
             "phase_idx": self.phase_idx,
             "pose_error": float(pose_error),
             "pose_held": self.pose_held,
-            "phase_complete": self.phase_complete
+            "phase_complete": self.phase_complete,
+            "hold_time": self.phase_hold_time,
+            "is_pose_good": is_pose_good,
+            "is_stable": is_stable
         }
 
     def _compute_reward(self, action, ctrl, pose_error, height_error):
@@ -262,23 +273,14 @@ class BurpeeHumanoidV5Env(gym.Env):
         ctrl_error = ctrl - ref_ctrl
         action_delta = action - self.previous_action
         
-        # Pose Reward
         pose_reward = np.exp(-5.0 * pose_error)
         height_reward = np.exp(-3.0 * height_error)
-        
-        # Kontroll-Kosten
         control_reward = np.exp(-0.35 * np.mean(ctrl_error * ctrl_error))
         smooth_reward = np.exp(-0.1 * np.mean(action_delta * action_delta))
         
-        # HOLD BONUS - wenn die Pose gehalten wurde
-        hold_bonus = 0.0
-        if self.pose_held:
-            hold_bonus = 3.0
-        
-        # Phase-Completed Bonus
+        hold_bonus = 3.0 if self.pose_held else 0.0
         phase_bonus = 2.0 if self.phase_complete else 0.0
         
-        # Alive Bonus
         root_height = self.data.qpos[self.root_qpos+2]
         alive_bonus = 0.5 if root_height > 0.15 else -1.0
         
