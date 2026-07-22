@@ -2,7 +2,8 @@
 
 Neuromorphic Control Assignment für den SoSe Kurs von Dr. rer. nat. Johannes Maria Leugering for Introduction to Neuromorphic Control
 
-We used the mujoco repository at LINK and build upon it.
+We used the mujoco repository at <https://mujoco.org> and <https://github.com/google-deepmind/mujoco/tree/main> to build upon it.
+Also we used Humanoid V5 (only XML) <https://gymnasium.farama.org/environments/mujoco/humanoid/>
 
 Link to Presentation:
 https://www.figma.com/board/lRynw06d1QNUb4VMZNYzNT/NC-Assignment?node-id=0-1&t=1X3BSlGuk0xQx8nC-1
