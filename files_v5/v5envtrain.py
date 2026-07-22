@@ -3,7 +3,7 @@ import gymnasium as gym
 import mujoco
 import numpy as np
 from gymnasium import spaces
-from v5.v5ref import reference_at_v5, JOINT_NAMES_V5, TOTAL_DURATION_V5
+from v5ref import reference_at_v5, JOINT_NAMES_V5, TOTAL_DURATION_V5
 
 class BurpeeHumanoidV5Env(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array", None]}
@@ -172,11 +172,9 @@ class BurpeeHumanoidV5Env(gym.Env):
         self.elapsed += self.dt
         self._apply_root_assist()
 
-        # Halte-Zeit aktualisieren
         ref = self._reference_func(self.elapsed)
         current_phase = ref["name"]
         
-        # Prüfen ob die Pose gut gehalten wird
         joint_error = self.data.qpos[self.joint_qpos] - ref["joints"]
         pose_error = np.mean(joint_error * joint_error)
         is_pose_good = pose_error < 0.5
@@ -195,17 +193,29 @@ class BurpeeHumanoidV5Env(gym.Env):
         
         root_height = self.data.qpos[self.root_qpos+2]
         
-        terminated = root_height < 0.12
+        if root_height < 0.12:
+            self.fallen = True
+            if root_height < 0.05:
+                terminated = True
+            else:
+                terminated = False
+        else:
+            self.fallen = False
+            terminated = False
+        
         truncated = self.elapsed >= self.episode_seconds
         
+        # Erweiterter info-Dict
         return self._get_obs(), float(reward), terminated, truncated, {
             "root_height": float(root_height),
             "phase": current_phase,
             "hold_time": self.phase_hold_time,
             "pose_held": self.pose_held,
-            "pose_error": float(pose_error)
+            "pose_error": float(pose_error),                      # NEU
+            "joint_error_mean": float(np.mean(joint_error * joint_error)),  # NEU
+            "control_cost": float(np.mean(ctrl * ctrl)),          # NEU
+            "fallen": self.fallen
         }
-
     def _compute_reward(self, action, ctrl):
         ref = self._reference_func(self.elapsed)
         joint_error = self.data.qpos[self.joint_qpos] - ref["joints"]

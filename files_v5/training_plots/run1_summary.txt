@@ -1,0 +1,29 @@
+Training Summary - run1
+============================================================
+
+rollout/ep_rew_mean:
+  Final: 3084.1689
+  Mean:  2818.8349
+  Max:   5278.1558
+  Min:   1778.2947
+
+rollout/ep_len_mean:
+  Final: 968.9600
+  Mean:  863.7298
+  Max:   1315.9100
+  Min:   553.1900
+
+train/learning_rate:
+  Final: 0.0002
+  Mean:  0.0002
+  Max:   0.0002
+  Min:   0.0002
+
+time/fps:
+  Final: 1247.0000
+  Mean:  1247.4335
+  Max:   1349.0000
+  Min:   1221.0000
+
+Average FPS: 1247.4
+============================================================

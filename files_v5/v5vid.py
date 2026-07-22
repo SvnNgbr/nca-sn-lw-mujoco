@@ -1,159 +1,223 @@
-import gymnasium as gym
-import mujoco
-import numpy as np
-import time
-import cv2
 import os
-from v5.v5ref import BURPEE_V5, JOINT_NAMES_V5, deg
+import argparse
+import numpy as np
+import matplotlib.pyplot as plt
+from pathlib import Path
+from tensorboard.backend.event_processing import event_accumulator
 
-def quat_from_euler_xyz(euler_deg):
-    roll, pitch, yaw = np.radians(euler_deg)
-    cr, sr = np.cos(roll/2), np.sin(roll/2)
-    cp, sp = np.cos(pitch/2), np.sin(pitch/2)
-    cy, sy = np.cos(yaw/2), np.sin(yaw/2)
-    return np.array([
-        cr*cp*cy + sr*sp*sy,
-        sr*cp*cy - cr*sp*sy,
-        cr*sp*cy + sr*cp*sy,
-        cr*cp*sy - sr*sp*cy
-    ])
+def find_event_files(logdir):
+    event_files = []
+    for root, dirs, files in os.walk(logdir):
+        for f in files:
+            if f.startswith("events.out.tfevents"):
+                event_files.append(os.path.join(root, f))
+    return event_files
 
-def apply_pose_stable(model, data, pose, joint_qpos, root_addr):
-    joints_rad = deg(pose["joints"])
+def extract_tb_data(event_file, tags):
+    ea = event_accumulator.EventAccumulator(event_file)
+    ea.Reload()
     
-    for i, qpos_addr in enumerate(joint_qpos):
-        if i < len(joints_rad):
-            data.qpos[qpos_addr] = joints_rad[i]
+    print("\nAvailable scalar tags:")
+    if 'scalars' in ea.Tags():
+        for tag in sorted(ea.Tags()['scalars']):
+            print(f"  {tag}")
+    print()
     
-    if "root_pos" in pose:
-        data.qpos[root_addr:root_addr+3] = pose["root_pos"]
-    if "root_euler" in pose:
-        root_quat = quat_from_euler_xyz(pose["root_euler"])
-        data.qpos[root_addr+3:root_addr+7] = root_quat
+    data = {}
+    for tag in tags:
+        if tag in ea.Tags()['scalars']:
+            events = ea.Scalars(tag)
+            if events:
+                data[tag] = {
+                    "steps": np.array([e.step for e in events]),
+                    "values": np.array([e.value for e in events])
+                }
+                print(f"Loaded {tag}: {len(events)} points")
+        else:
+            print(f"Tag not found: {tag}")
     
-    data.qvel[:] = 0.0
-    mujoco.mj_forward(model, data)
+    return data
+
+def smooth_data(values, window=20):
+    if len(values) < window:
+        return values
+    return np.convolve(values, np.ones(window)/window, mode='valid')
+
+def plot_metrics(data, output_dir, run_name, window=20):
+    fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+    fig.suptitle(f"Training Metrics - {run_name}", fontsize=16, fontweight="bold")
+    
+    # Definiere die 4 Metriken, die geplottet werden sollen
+    metrics = [
+        ("rollout/ep_rew_mean", "Episode Reward", "Reward", "#1f77b4"),
+        ("rollout/ep_len_mean", "Episode Length", "Steps", "#ff7f0e"),
+        ("train/learning_rate", "Learning Rate", "Rate", "#2ca02c"),
+        ("time/fps", "Frames per Second (FPS)", "FPS", "#d62728"),
+    ]
+    
+    plot_idx = 0
+    for tag, title, ylabel, color in metrics:
+        row = plot_idx // 2
+        col = plot_idx % 2
+        ax = axes[row, col]
+        
+        # Versuche alternative Tag-Namen
+        found = False
+        for alt_tag in [tag, tag.split('/')[-1]]:
+            if alt_tag in data and len(data[alt_tag]["steps"]) > 0:
+                d = data[alt_tag]
+                found = True
+                break
+        
+        if not found:
+            ax.text(0.5, 0.5, f"No data for {title}", 
+                   horizontalalignment='center', verticalalignment='center',
+                   transform=ax.transAxes, fontsize=12, color='gray')
+            ax.set_title(title)
+            ax.set_visible(True)
+            plot_idx += 1
+            continue
+        
+        steps = d["steps"]
+        values = d["values"]
+        
+        # Raw data
+        ax.plot(steps, values, linewidth=1, color=color, alpha=0.4, label="Raw")
+        
+        # Smoothed data
+        if len(values) > window:
+            smoothed = smooth_data(values, window)
+            smooth_steps = steps[:len(smoothed)]
+            ax.plot(smooth_steps, smoothed, linewidth=2, color=color, 
+                   label=f"Smoothed (n={window})")
+        
+        ax.set_xlabel("Timesteps", fontsize=11)
+        ax.set_ylabel(ylabel, fontsize=11)
+        ax.set_title(title, fontsize=13, fontweight="bold")
+        ax.legend(loc="best", fontsize=9)
+        ax.grid(True, alpha=0.3)
+        
+        plot_idx += 1
+    
+    plt.tight_layout()
+    
+    png_path = output_dir / f"{run_name}_metrics.png"
+    pdf_path = output_dir / f"{run_name}_metrics.pdf"
+    plt.savefig(png_path, dpi=200, bbox_inches="tight")
+    plt.savefig(pdf_path, bbox_inches="tight")
+    plt.close()
+    
+    return png_path, pdf_path
+
+def generate_summary(data, output_dir, run_name):
+    summary_path = output_dir / f"{run_name}_summary.txt"
+    
+    with open(summary_path, "w") as f:
+        f.write(f"Training Summary - {run_name}\n")
+        f.write("="*60 + "\n\n")
+        
+        for tag, d in data.items():
+            if len(d["values"]) > 0:
+                final_val = d["values"][-1]
+                mean_val = np.mean(d["values"])
+                max_val = np.max(d["values"])
+                min_val = np.min(d["values"])
+                
+                f.write(f"{tag}:\n")
+                f.write(f"  Final: {final_val:.4f}\n")
+                f.write(f"  Mean:  {mean_val:.4f}\n")
+                f.write(f"  Max:   {max_val:.4f}\n")
+                f.write(f"  Min:   {min_val:.4f}\n")
+                f.write("\n")
+        
+        f.write("="*60 + "\n")
 
 def main():
-    # Video settings
-    FPS = 30
-    RUNS = 3  # Number of burpee cycles
-    FRAME_INTERVAL = 1.0 / FPS
+    parser = argparse.ArgumentParser(
+        description="Generate training plots and summaries from TensorBoard logs."
+    )
+    parser.add_argument(
+        "--logdir",
+        type=str,
+        default="runs_humanoid_v5",
+        help="Directory containing TensorBoard logs"
+    )
+    parser.add_argument(
+        "--run-name",
+        type=str,
+        default=None,
+        help="Name for the run (used in output filenames)"
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default="training_plots",
+        help="Directory to save plots and summaries"
+    )
+    parser.add_argument(
+        "--window",
+        type=int,
+        default=20,
+        help="Window size for smoothing"
+    )
+    args = parser.parse_args()
     
-    # Create videos directory
-    os.makedirs("videos", exist_ok=True)
-    video_name = time.strftime("videos/burpee_v5_%Y%m%d_%H%M%S.mp4")
+    base_dir = Path(__file__).parent.parent.absolute()
+    logdir = Path(args.logdir)
+    if not logdir.is_absolute():
+        logdir = base_dir / logdir
     
-    env = gym.make("Humanoid-v5", render_mode="rgb_array")
-    obs, info = env.reset()
+    output_dir = base_dir / args.output_dir
+    output_dir.mkdir(exist_ok=True)
     
-    model = env.unwrapped.model
-    data = env.unwrapped.data
+    if args.run_name:
+        run_name = args.run_name
+    else:
+        run_name = logdir.name
     
-    # Find joints
-    joint_qpos = []
-    for name in JOINT_NAMES_V5:
-        try:
-            joint_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, name)
-            joint_qpos.append(model.jnt_qposadr[joint_id])
-        except:
-            joint_qpos.append(-1)
+    print(f"Processing logs from: {logdir}")
+    print(f"Output directory: {output_dir}")
+    print(f"Run name: {run_name}")
     
-    valid_qpos = [q for q in joint_qpos if q >= 0]
-    
-    # Find root
-    root_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, "root")
-    root_addr = model.jnt_qposadr[root_id]
-    
-    # Total duration of one cycle
-    total_pose_duration = sum(p["duration"] for p in BURPEE_V5)
-    total_video_duration = total_pose_duration * RUNS
-    
-    print(f"Video duration: {total_video_duration:.1f} seconds")
-    print(f"Frame rate: {FPS} FPS")
-    print(f"Total frames: {int(total_video_duration * FPS)}")
-    print(f"Output: {video_name}")
-    print("Generating video... (this may take a moment)")
-    
-    # Get first frame for video dimensions
-    frame = env.render()
-    if frame is None:
-        print("Error: Could not get frame from environment.")
-        env.close()
+    event_files = find_event_files(logdir)
+    if not event_files:
+        print(f"No event files found in {logdir}")
         return
     
-    height, width = frame.shape[:2]
+    latest_event = max(event_files, key=os.path.getmtime)
+    print(f"Using event file: {latest_event}")
     
-    # Initialize video writer
-    video = cv2.VideoWriter(
-        video_name,
-        cv2.VideoWriter_fourcc(*"mp4v"),
-        FPS,
-        (width, height)
-    )
+    all_tags = [
+        "rollout/ep_rew_mean",
+        "rollout/ep_len_mean",
+        "train/learning_rate",
+        "time/fps",
+        "ep_rew_mean",
+        "ep_len_mean",
+        "learning_rate",
+        "fps",
+    ]
     
-    frame_count = 0
-    t = 0.0
+    data = extract_tb_data(latest_event, all_tags)
     
-    # Run through the burpee sequence RUNS times
-    for run in range(RUNS):
-        print(f"Run {run+1}/{RUNS}")
-        
-        # Reset at start of each run
-        obs, info = env.reset()
-        
-        # Run through one full cycle
-        while t < total_pose_duration:
-            # Find current pose
-            cursor = 0.0
-            for idx, keyframe in enumerate(BURPEE_V5):
-                next_keyframe = BURPEE_V5[(idx + 1) % len(BURPEE_V5)]
-                segment_duration = keyframe["duration"]
-                
-                if cursor <= t < cursor + segment_duration:
-                    alpha = (t - cursor) / segment_duration
-                    
-                    # Interpolate pose
-                    pose = {
-                        "name": keyframe["name"],
-                        "root_pos": (1 - alpha) * np.array(keyframe["root_pos"]) + alpha * np.array(next_keyframe["root_pos"]),
-                        "root_euler": (1 - alpha) * np.array(keyframe["root_euler"]) + alpha * np.array(next_keyframe["root_euler"]),
-                        "joints": (1 - alpha) * np.array(keyframe["joints"]) + alpha * np.array(next_keyframe["joints"])
-                    }
-                    
-                    # Apply pose
-                    apply_pose_stable(model, data, pose, valid_qpos, root_addr)
-                    
-                    # Render frame
-                    frame = env.render()
-                    if frame is not None:
-                        frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-                        video.write(frame_bgr)
-                        frame_count += 1
-                    
-                    # MuJoCo step
-                    for _ in range(5):
-                        mujoco.mj_step(model, data)
-                    
-                    break
-                cursor += segment_duration
-            
-            t += FRAME_INTERVAL
-            
-            # Show progress
-            if frame_count % 100 == 0:
-                progress = (run * total_pose_duration + t) / (RUNS * total_pose_duration) * 100
-                print(f"  Progress: {progress:.1f}% (frames: {frame_count})")
-        
-        t = 0.0  # Reset for next run
+    if not data:
+        print("No data extracted. Check that the event file contains scalar data.")
+        return
     
-    # Cleanup
-    video.release()
-    env.close()
+    png_path, pdf_path = plot_metrics(data, output_dir, run_name, args.window)
+    print(f"\nPlots saved to:")
+    print(f"  PNG: {png_path}")
+    print(f"  PDF: {pdf_path}")
     
-    print(f"\nVideo saved: {video_name}")
-    print(f"Total frames: {frame_count}")
-    print(f"File size: {os.path.getsize(video_name) / (1024*1024):.1f} MB")
+    generate_summary(data, output_dir, run_name)
+    print(f"Summary saved to: {output_dir / f'{run_name}_summary.txt'}")
+    
+    for tag, d in data.items():
+        if len(d["steps"]) > 0:
+            csv_path = output_dir / f"{run_name}_{tag.replace('/', '_')}.csv"
+            np.savetxt(csv_path, np.column_stack([d["steps"], d["values"]]), 
+                      delimiter=",", header="steps,values", comments="")
+    print(f"Raw data saved as CSV files in: {output_dir}")
 
 if __name__ == "__main__":
     main()

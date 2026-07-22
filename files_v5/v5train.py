@@ -1,7 +1,7 @@
 from pathlib import Path
 from stable_baselines3 import PPO
 from stable_baselines3.common.monitor import Monitor
-from v5.v5envtrain import BurpeeHumanoidV5Env
+from v5envtrain import BurpeeHumanoidV5Env
 
 MODEL_DIR = Path("trained_models_humanoid_v5")
 MODEL_DIR.mkdir(exist_ok=True)
@@ -10,8 +10,7 @@ STAGES = [
     {"name": "teacher_strong", "root_assist": 0.98, "steps": 300_000},
     {"name": "teacher_medium", "root_assist": 0.75, "steps": 500_000},
     {"name": "teacher_light", "root_assist": 0.45, "steps": 700_000},
-    {"name": "teacher_morethanlight", "root_assist": 0.15, "steps": 1_000_000},
-    {"name": "teacher_none", "root_assist": 0.0, "steps": 1_500_000},
+    {"name": "teacher_none", "root_assist": 0.0, "steps": 1_000_000},
 ]
 
 def make_env(root_assist):
@@ -42,7 +41,7 @@ def main():
             model = PPO(
                 "MlpPolicy",
                 env,
-                verbose=1,
+                verbose=2,
                 n_steps=2048,
                 batch_size=256,
                 learning_rate=2e-4,
