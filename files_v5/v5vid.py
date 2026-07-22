@@ -3,7 +3,7 @@ import mujoco
 import numpy as np
 import time
 from PIL import Image
-from v5ref import BURPEE_V5, JOINT_NAMES_V5, deg
+from v5.v5ref import BURPEE_V5, JOINT_NAMES_V5, deg
 
 def quat_from_euler_xyz(euler_deg):
     roll, pitch, yaw = np.radians(euler_deg)

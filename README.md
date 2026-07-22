@@ -55,8 +55,26 @@ You should now be all set to execute the main programs for each task!
 
 # How to run:
 
-mjpython v5train.py
-than
-mjpython v5watch.py
-or
-python v5vid.py
+# V5 training + video (standard)
+
+python run.py
+
+# only V5 training
+
+python run.py --mode train
+
+# only V5 video with prev. existing modell
+
+python run.py --mode video --skip-train
+
+# V3 training + video
+
+python run.py --version v3
+
+# V3 video with root-Assist
+
+python run.py --version v3 --mode video --skip-train --root-assist 0.5
+
+# V5 video with root-Assist
+
+python run.py --mode video --skip-train --root-assist 0.5

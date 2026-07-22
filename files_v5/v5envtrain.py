@@ -3,7 +3,7 @@ import gymnasium as gym
 import mujoco
 import numpy as np
 from gymnasium import spaces
-from v5ref import reference_at_v5, JOINT_NAMES_V5, TOTAL_DURATION_V5
+from v5.v5ref import reference_at_v5, JOINT_NAMES_V5, TOTAL_DURATION_V5
 
 class BurpeeHumanoidV5Env(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array", None]}

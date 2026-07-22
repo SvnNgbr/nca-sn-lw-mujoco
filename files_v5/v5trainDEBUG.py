@@ -1,7 +1,7 @@
 from pathlib import Path
 from stable_baselines3 import PPO
 from stable_baselines3.common.monitor import Monitor
-from v5envtrain import BurpeeHumanoidV5Env
+from v5.v5envtrain import BurpeeHumanoidV5Env
 
 MODEL_DIR = Path("trained_models_humanoid_v5")
 MODEL_DIR.mkdir(exist_ok=True)

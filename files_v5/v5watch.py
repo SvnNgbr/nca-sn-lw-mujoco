@@ -5,7 +5,7 @@ import gymnasium as gym
 import mujoco
 import mujoco.viewer
 from stable_baselines3 import PPO
-from v5envtrain import BurpeeHumanoidV5Env
+from v5.v5envtrain import BurpeeHumanoidV5Env
 
 def main():
     parser = argparse.ArgumentParser()

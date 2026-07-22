@@ -6,7 +6,7 @@ import mujoco
 import mujoco.viewer
 from stable_baselines3 import PPO
 
-from burpee_imitation_env_v2 import BurpeeImitationEnvV2
+from imitationv2.burpee_imitation_env_v2 import BurpeeImitationEnvV2
 
 
 def main():
